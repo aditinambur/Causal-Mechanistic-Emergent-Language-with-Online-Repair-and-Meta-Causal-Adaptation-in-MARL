@@ -1,13 +1,19 @@
     
 import time
-import wandb
+try:
+    # pyrefly: ignore [missing-import]
+    import wandb
+except Exception:
+    wandb = None
 import os
 import numpy as np
 from itertools import chain
 import torch
 
 from onpolicy.utils.util import update_linear_schedule
+# pyrefly: ignore [missing-import]
 from onpolicy.runner.separated.base_runner import Runner
+# pyrefly: ignore [missing-import]
 import imageio
 
 def _t2n(x):
@@ -130,7 +136,7 @@ class MPERunner(Runner):
             temp_actions_env.append(action_env)
             action_log_probs.append(_t2n(action_log_prob))
             rnn_states.append(_t2n(rnn_state))
-            rnn_states_critic.append( _t2n(rnn_state_critic))
+            rnn_states_critic.append(_t2n(rnn_state_critic))
 
         # [envs, agents, dim]
         actions_env = []
