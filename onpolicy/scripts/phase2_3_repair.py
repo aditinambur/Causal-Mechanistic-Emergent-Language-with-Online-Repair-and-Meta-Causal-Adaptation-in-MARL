@@ -797,6 +797,23 @@ def main(args):
     parser = get_config()
     all_args = parse_args(args, parser)
 
+    # get_config()'s own --env_name default is "StarCraft2" (this repo supports several
+    # environments; phase2_3_repair.py does not -- see _make_mpe_vec_env above). Forcing it
+    # here means every --model_dir/--no_repair invocation works without the caller having to
+    # know to pass --env_name MPE, and a typo'd --env_name value fails fast with a clear
+    # message instead of as an opaque NotImplementedError raised inside N worker subprocesses.
+    # Detected from the raw argv (not the parsed default, which is always "StarCraft2" whether
+    # or not --env_name was actually passed) so that omitting --env_name is always allowed.
+    if "--env_name" in args:
+        idx = args.index("--env_name")
+        explicit_value = args[idx + 1] if idx + 1 < len(args) else None
+        if explicit_value != "MPE":
+            raise SystemExit(
+                "phase2_3_repair.py only supports --env_name MPE (got {!r}). This script "
+                "does not implement other environments; drop --env_name entirely (it now "
+                "defaults to MPE) or pass --env_name MPE explicitly.".format(explicit_value))
+    all_args.env_name = "MPE"
+
     # Match train_mpe.py: mappo is non-recurrent.
     if all_args.algorithm_name == "mappo":
         all_args.use_recurrent_policy = False
