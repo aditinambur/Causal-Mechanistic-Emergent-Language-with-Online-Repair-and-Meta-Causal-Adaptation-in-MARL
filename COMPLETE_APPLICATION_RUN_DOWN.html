@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Complete Run Down - Multi-Agent Emergent Communication & Online Repair</title>
+    <!-- MathJax for rendering math expressions -->
+    <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4;
+            margin: 18mm 16mm 18mm 16mm;
+            @bottom-right {
+                content: counter(page);
+            }
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #1e293b;
+            background-color: #ffffff;
+            line-height: 1.6;
+            font-size: 10.5pt;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            font-size: 20pt;
+            font-weight: 800;
+            color: #0f172a;
+            border-bottom: 2.5px solid #2563eb;
+            padding-bottom: 8px;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        h2 {
+            font-size: 14pt;
+            font-weight: 700;
+            color: #1e3a8a;
+            border-bottom: 1.5px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 12pt;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            page-break-after: avoid;
+        }
+        h4 {
+            font-size: 11pt;
+            font-weight: 600;
+            color: #475569;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            page-break-after: avoid;
+        }
+        p, ul, ol {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 4px;
+        }
+        code {
+            font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+            background-color: #f1f5f9;
+            color: #0f172a;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 9pt;
+            border: 1px solid #e2e8f0;
+        }
+        pre {
+            font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+            background-color: #0f172a;
+            color: #f8fafc;
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 8.5pt;
+            overflow-x: auto;
+            line-height: 1.45;
+            page-break-inside: avoid;
+            margin-top: 6px;
+            margin-bottom: 14px;
+        }
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            border: none;
+            font-size: inherit;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            margin-bottom: 16px;
+            font-size: 9pt;
+            page-break-inside: avoid;
+        }
+        th, td {
+            padding: 7px 10px;
+            border: 1px solid #cbd5e1;
+            text-align: left;
+        }
+        th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        blockquote {
+            margin: 12px 0;
+            padding: 10px 14px;
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+            font-size: 9.5pt;
+            border-radius: 0 6px 6px 0;
+            page-break-inside: avoid;
+        }
+        blockquote p {
+            margin: 0;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #e2e8f0;
+            margin: 20px 0;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .math-display {
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="complete-run-down-of-the-multi-agent-emergent-communication-online-repair-platform">Complete Run Down of the Multi-Agent Emergent Communication &amp; Online Repair Platform</h1>
+<hr />
+<h2 id="1-system-overview-core-philosophy">1. System Overview &amp; Core Philosophy</h2>
+<h3 id="11-the-research-problem">1.1 The Research Problem</h3>
+<p>In Multi-Agent Reinforcement Learning (MARL), cooperative agents frequently learn <strong>emergent communication protocols</strong>—discrete or continuous message vectors exchanged to coordinate actions. However, real-world multi-agent deployments face distribution shifts, sensor drift, physical recalibrations, or partner swaps. When the environment shifts, learned communication protocols often become misaligned or counterproductive.</p>
+<p>Standard RL approaches either:
+1. <strong>Ignore communication</strong>: Retraining everything from scratch when task reward drops, which is computationally expensive and causes catastrophic forgetting.
+2. <strong>Use naive reward-based triggers</strong>: Attempting retraining whenever reward falls, even if the failure is caused by physical dynamics rather than communication breakdown.</p>
+<h3 id="12-the-solution-the-meta-causal-closed-loop">1.2 The Solution: The Meta-Causal Closed Loop</h3>
+<p>This platform implements a <strong>causal mechanistic framework</strong> that uses interventional diagnostics to monitor, detect, isolate, and repair broken emergent communication protocols in multi-agent systems.</p>
+<div class="codehilite"><pre><span></span><code><span class="w">       </span><span class="p">[</span><span class="w"> </span><span class="n">Trained</span><span class="w"> </span><span class="n">Policy</span><span class="w"> </span><span class="kr">Checkpoint</span><span class="w"> </span><span class="p">]</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">1.</span><span class="w"> </span><span class="n">Baseline</span><span class="w"> </span><span class="n">Causal</span><span class="w"> </span><span class="n">Fingerprint</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">do</span><span class="p">(</span><span class="n">normal</span><span class="p">)</span><span class="w"> </span><span class="n">vs</span><span class="w"> </span><span class="n">do</span><span class="p">(</span><span class="n">no_messages</span><span class="p">)</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Measure</span><span class="w"> </span><span class="n">comm_effect</span><span class="p">,</span><span class="w"> </span><span class="n">KL</span><span class="p">,</span><span class="w"> </span><span class="n">Value</span><span class="w"> </span><span class="n">Sensitivity</span><span class="w"> </span><span class="p">(</span><span class="n">CRN</span><span class="o">-</span><span class="n">paired</span><span class="p">)</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">2.</span><span class="w"> </span><span class="n">Environment</span><span class="w"> </span><span class="n">Perturbation</span><span class="w"> </span><span class="n">Applied</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Coordinate</span><span class="w"> </span><span class="n">Mirroring</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Sensor</span><span class="w"> </span><span class="n">Drift</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">3.</span><span class="w"> </span><span class="n">Degradation</span><span class="w"> </span><span class="n">Detection</span><span class="w"> </span><span class="p">(</span><span class="n">Dual</span><span class="o">-</span><span class="n">Gated</span><span class="p">)</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Is</span><span class="w"> </span><span class="n">Reward</span><span class="w"> </span><span class="n">dropped</span><span class="o">?</span><span class="w"> </span><span class="kr">AND</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Is</span><span class="w"> </span><span class="n">comm_effect</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">value_sensitivity</span><span class="w"> </span><span class="n">collapsed</span><span class="o">?</span>
+<span class="w">            </span><span class="err">├──</span><span class="w"> </span><span class="n">NO</span><span class="w">  </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Refuse</span><span class="w"> </span><span class="n">Repair</span><span class="w"> </span><span class="p">(</span><span class="n">Avoid</span><span class="w"> </span><span class="n">spurious</span><span class="w"> </span><span class="n">intervention</span><span class="p">)</span>
+<span class="w">            </span><span class="err">└──</span><span class="w"> </span><span class="n">YES</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Trigger</span><span class="w"> </span><span class="n">Adaptive</span><span class="w"> </span><span class="n">Repair</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">4.</span><span class="w"> </span><span class="n">Rule</span><span class="o">-</span><span class="n">Based</span><span class="w"> </span><span class="n">Controller</span><span class="w"> </span><span class="p">(</span><span class="n">Select</span><span class="w"> </span><span class="n">Target</span><span class="p">)</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">embedding</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">comm</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">lora</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kr">full</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">5.</span><span class="w"> </span><span class="n">Snapshot</span><span class="w"> </span><span class="n">State</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Actor</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Critic</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Attention</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Adam</span><span class="w"> </span><span class="n">Optimizer</span><span class="w"> </span><span class="n">States</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ValueNorm</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">6.</span><span class="w"> </span><span class="n">Online</span><span class="w"> </span><span class="n">PPO</span><span class="w"> </span><span class="n">Repair</span><span class="w"> </span><span class="n">Rollouts</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="n">Restricted</span><span class="w"> </span><span class="n">gradient</span><span class="w"> </span><span class="n">updates</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">perturbed</span><span class="w"> </span><span class="n">environment</span>
+<span class="w">                     </span><span class="err">│</span>
+<span class="w">                     </span><span class="err">▼</span>
+<span class="w">         </span><span class="mf">7.</span><span class="w"> </span><span class="n">Accept</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Reject</span><span class="w"> </span><span class="n">Gating</span>
+<span class="w">            </span><span class="o">-</span><span class="w"> </span><span class="kr">Recovery</span><span class="p">(</span><span class="n">Reward</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">50</span><span class="o">%</span><span class="w"> </span><span class="kr">AND</span><span class="w"> </span><span class="kr">Recovery</span><span class="p">(</span><span class="n">comm_effect</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">50</span><span class="o">%</span>
+<span class="w">            </span><span class="err">├──</span><span class="w"> </span><span class="n">ACCEPTED</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Held</span><span class="o">-</span><span class="n">Out</span><span class="w"> </span><span class="n">Generalization</span><span class="w"> </span><span class="n">Validation</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="kr">Persist</span><span class="w"> </span><span class="kr">Checkpoint</span>
+<span class="w">            </span><span class="err">└──</span><span class="w"> </span><span class="nf">REJECTED</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Bit</span><span class="o">-</span><span class="n">Exact</span><span class="w"> </span><span class="n">Rollback</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="n">Escalate</span><span class="w"> </span><span class="n">Ladder</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span><span class="w"> </span><span class="n">comm</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">lora</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="2-platform-architecture-technology-stack">2. Platform Architecture &amp; Technology Stack</h2>
+<p>The platform is structured into three clean layers:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">┌──────────────────────────────────────────────────────────────────────────┐</span>
+<span class="n">│</span><span class="w">                   </span><span class="n">React</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">TypeScript</span><span class="w"> </span><span class="n">Web</span><span class="w"> </span><span class="n">Frontend</span><span class="w">                        </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="kt">Real</span><span class="o">-</span><span class="kt">time</span><span class="w"> </span><span class="n">Experiment</span><span class="w"> </span><span class="n">Launcher</span><span class="w"> </span><span class="p">(</span><span class="n">MAPPO</span><span class="w"> </span><span class="n">params</span><span class="p">,</span><span class="w"> </span><span class="n">flags</span><span class="p">,</span><span class="w"> </span><span class="n">seeds</span><span class="p">)</span><span class="w">           </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Live</span><span class="w"> </span><span class="n">Training</span><span class="w"> </span><span class="n">Metrics</span><span class="w"> </span><span class="p">(</span><span class="n">Losses</span><span class="p">,</span><span class="w"> </span><span class="k">Returns</span><span class="p">,</span><span class="w"> </span><span class="n">Interventions</span><span class="p">)</span><span class="w">               </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Causal</span><span class="w"> </span><span class="k">Repair</span><span class="w"> </span><span class="n">Dashboard</span><span class="w"> </span><span class="p">(</span><span class="n">Detection</span><span class="w"> </span><span class="k">status</span><span class="p">,</span><span class="w"> </span><span class="n">Recovery</span><span class="w"> </span><span class="n">gates</span><span class="p">,</span><span class="w"> </span><span class="n">Confirms</span><span class="p">)</span><span class="w"> </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Episode</span><span class="w"> </span><span class="n">Replay</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Rollout</span><span class="w"> </span><span class="n">Visualizer</span><span class="w">                                  </span><span class="n">│</span>
+<span class="n">└────────────────────────────────────┬─────────────────────────────────────┘</span>
+<span class="w">                                     </span><span class="n">│</span><span class="w"> </span><span class="n">HTTP</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">REST</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">WebSockets</span><span class="w"> </span><span class="p">(</span><span class="k">Port</span><span class="w"> </span><span class="mi">8001</span><span class="o">/</span><span class="mi">8000</span><span class="p">)</span>
+<span class="n">┌────────────────────────────────────▼─────────────────────────────────────┐</span>
+<span class="n">│</span><span class="w">                       </span><span class="n">FastAPI</span><span class="w"> </span><span class="n">Backend</span><span class="w"> </span><span class="n">Service</span><span class="w">                            </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="k">Process</span><span class="w"> </span><span class="n">Manager</span><span class="o">:</span><span class="w"> </span><span class="n">Background</span><span class="w"> </span><span class="n">execution</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">train_mpe</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="k">repair</span><span class="w">         </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Run</span><span class="w"> </span><span class="n">Registry</span><span class="o">:</span><span class="w"> </span><span class="n">Automatic</span><span class="w"> </span><span class="n">checkpoint</span><span class="w"> </span><span class="n">scanning</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">metadata</span><span class="w"> </span><span class="n">tracking</span><span class="w">      </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Causal</span><span class="w"> </span><span class="n">Log</span><span class="w"> </span><span class="n">Aggregator</span><span class="o">:</span><span class="w"> </span><span class="n">Computes</span><span class="w"> </span><span class="n">fingerprint</span><span class="w"> </span><span class="n">deltas</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">recovery</span><span class="w"> </span><span class="n">scores</span><span class="w"> </span><span class="n">│</span>
+<span class="n">└────────────────────────────────────┬─────────────────────────────────────┘</span>
+<span class="w">                                     </span><span class="n">│</span><span class="w"> </span><span class="n">Direct</span><span class="w"> </span><span class="n">Python</span><span class="w"> </span><span class="n">Invocation</span>
+<span class="n">┌────────────────────────────────────▼─────────────────────────────────────┐</span>
+<span class="n">│</span><span class="w">                 </span><span class="n">Core</span><span class="w"> </span><span class="k">On</span><span class="o">-</span><span class="n">Policy</span><span class="w"> </span><span class="k">Engine</span><span class="w"> </span><span class="p">(</span><span class="n">PyTorch</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">CUDA</span><span class="p">)</span><span class="w">                   </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">MAPPO</span><span class="w"> </span><span class="k">Algorithm</span><span class="w"> </span><span class="n">Stack</span><span class="w"> </span><span class="p">(</span><span class="n n-Quoted">`r_mappo_comm`</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n n-Quoted">`macppo`</span><span class="p">)</span><span class="w">                     </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Causal</span><span class="w"> </span><span class="n">Mechanistic</span><span class="w"> </span><span class="n">Intervention</span><span class="w"> </span><span class="n">Layer</span><span class="w"> </span><span class="p">(</span><span class="n n-Quoted">`comm.py`</span><span class="p">,</span><span class="w"> </span><span class="n n-Quoted">`mpe_runner.py`</span><span class="p">)</span><span class="w">   </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Online</span><span class="w"> </span><span class="k">Repair</span><span class="w"> </span><span class="n">Controller</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Escalation</span><span class="w"> </span><span class="p">(</span><span class="n n-Quoted">`phase2_3_repair.py`</span><span class="p">)</span><span class="w">         </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Low</span><span class="o">-</span><span class="k">Rank</span><span class="w"> </span><span class="n">Adaptation</span><span class="w"> </span><span class="p">(</span><span class="n">LoRA</span><span class="p">)</span><span class="w"> </span><span class="n">Subsystem</span><span class="w"> </span><span class="p">(</span><span class="n n-Quoted">`lora.py`</span><span class="p">)</span><span class="w">                     </span><span class="n">│</span>
+<span class="n">│</span><span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Vectorized</span><span class="w"> </span><span class="n">Multi</span><span class="o">-</span><span class="n">Agent</span><span class="w"> </span><span class="n">Environments</span><span class="w"> </span><span class="p">(</span><span class="n n-Quoted">`MPE`</span><span class="p">,</span><span class="w"> </span><span class="n n-Quoted">`mirror_wrapper.py`</span><span class="p">)</span><span class="w">     </span><span class="n">│</span>
+<span class="n">└──────────────────────────────────────────────────────────────────────────┘</span>
+</code></pre></div>
+
+<hr />
+<h2 id="3-how-to-run-on-terminal-via-docker-view-results">3. How to Run on Terminal via Docker &amp; View Results</h2>
+<p>Because this project relies on specific pinned dependencies (<code>PyTorch 1.13.1</code>, <code>CUDA 11.6</code>, <code>Gym 0.19.0</code>, <code>NumPy &lt; 2</code>, <code>Protobuf &lt;= 3.20.3</code>), running natively on Windows can lead to binary incompatibility issues. <strong>The entire stack is containerized using Docker and Docker Compose with NVIDIA GPU passthrough.</strong></p>
+<h3 id="31-starting-the-docker-containers">3.1 Starting the Docker Containers</h3>
+<p>From the repository root on your host machine:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Build and start all services in detached mode</span>
+<span class="n">docker</span> <span class="n">compose</span> <span class="n">up</span> <span class="p">-</span><span class="n">-build</span> <span class="n">-d</span>
+
+<span class="c"># Verify both containers are running healthy</span>
+<span class="n">docker</span> <span class="n">compose</span> <span class="nb">ps</span>
+</code></pre></div>
+
+<p>This launches two services:
+1. <strong><code>backend</code></strong>: FastAPI API server running inside PyTorch CUDA container on port <code>8001</code> (mapped to internal <code>8000</code>).
+2. <strong><code>frontend</code></strong>: React + Vite UI running on port <code>5173</code>.</p>
+<hr />
+<h3 id="32-accessing-the-interactive-interfaces">3.2 Accessing the Interactive Interfaces</h3>
+<ul>
+<li><strong>Frontend Dashboard</strong>: Open <a href="http://localhost:5173">http://localhost:5173</a> in your browser.</li>
+<li>Launch new training runs with custom hyper-parameters.</li>
+<li>Trigger one-click causal repair against any completed checkpoint.</li>
+<li>View real-time interactive charts and causal diagnostic fingerprints.</li>
+<li><strong>FastAPI Backend Swagger Docs</strong>: Open <a href="http://localhost:8001/docs">http://localhost:8001/docs</a>.</li>
+<li><strong>Backend Health Check</strong>: Open <a href="http://localhost:8001/health">http://localhost:8001/health</a>.</li>
+</ul>
+<hr />
+<h3 id="33-running-experiments-directly-via-terminal-inside-docker">3.3 Running Experiments Directly via Terminal inside Docker</h3>
+<p>To run scripts directly from the command line inside the container:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Open an interactive bash shell inside the running backend container</span>
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>bash
+</code></pre></div>
+
+<p>Inside the container shell, all commands are executed from <code>/workspace</code>:</p>
+<h4 id="step-a-train-a-new-emergent-communication-model">Step A: Train a New Emergent Communication Model</h4>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>onpolicy/scripts/train/train_mpe.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--env_name<span class="w"> </span>MPE<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scenario_name<span class="w"> </span>simple_spread<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--algorithm_name<span class="w"> </span>mappo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--experiment_name<span class="w"> </span>exp_baseline<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--num_agents<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--num_landmarks<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--seed<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--n_rollout_threads<span class="w"> </span><span class="m">32</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--num_env_steps<span class="w"> </span><span class="m">2000000</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--episode_length<span class="w"> </span><span class="m">25</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--eval_interval<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--use_eval<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--eval_noise_std<span class="w"> </span><span class="m">0</span>.25<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--save_interval<span class="w"> </span><span class="m">50000</span>
+</code></pre></div>
+
+<h4 id="step-b-run-the-causal-online-repair-pipeline-with-lora-adaptation">Step B: Run the Causal Online Repair Pipeline (with LoRA Adaptation)</h4>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>onpolicy/scripts/phase2_3_repair.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--env_name<span class="w"> </span>MPE<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scenario_name<span class="w"> </span>simple_spread<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--algorithm_name<span class="w"> </span>mappo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--seed<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--model_dir<span class="w"> </span>onpolicy/scripts/results/MPE/simple_spread/mappo/exp_baseline/run1/models/checkpoint_1958400<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mirror_scope<span class="w"> </span>partner_full<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--controller<span class="w"> </span>causal<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--lora_rank<span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--lora_alpha<span class="w"> </span><span class="m">8</span>.0<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--measure_episodes<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--repair_iters<span class="w"> </span><span class="m">15</span>
+</code></pre></div>
+
+<h4 id="step-c-run-experimental-control-arms-for-scientific-comparison">Step C: Run Experimental Control Arms for Scientific Comparison</h4>
+<ol>
+<li><strong>Reward-Only Trigger Control (Naive Baseline)</strong>:
+   <code>bash
+   python onpolicy/scripts/phase2_3_repair.py \
+       --model_dir &lt;CHECKPOINT_PATH&gt; \
+       --controller reward_only \
+       --measure_episodes 8 \
+       --repair_iters 15</code></li>
+<li><strong>Non-Communication Parameter Control (<code>noncomm</code>)</strong>:
+   <code>bash
+   python onpolicy/scripts/phase2_3_repair.py \
+       --model_dir &lt;CHECKPOINT_PATH&gt; \
+       --repair_target noncomm \
+       --measure_episodes 8 \
+       --repair_iters 15</code></li>
+<li><strong>Specific Fixed Target (Forcing LoRA or Embedding)</strong>:
+   <code>bash
+   python onpolicy/scripts/phase2_3_repair.py \
+       --model_dir &lt;CHECKPOINT_PATH&gt; \
+       --repair_target lora \
+       --lora_rank 4 \
+       --measure_episodes 8 \
+       --repair_iters 15</code></li>
+</ol>
+<h4 id="step-d-render-visual-episodes-and-videos">Step D: Render Visual Episodes and Videos</h4>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>onpolicy/scripts/render/render_mpe.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--env_name<span class="w"> </span>MPE<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--scenario_name<span class="w"> </span>simple_spread<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--algorithm_name<span class="w"> </span>mappo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--model_dir<span class="w"> </span>&lt;CHECKPOINT_PATH&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--render_episodes<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--save_gifs
+</code></pre></div>
+
+<hr />
+<h3 id="34-where-and-how-to-inspect-results">3.4 Where and How to Inspect Results</h3>
+<ol>
+<li><strong>Directory Structure on Disk</strong>:
+   All training artifacts and repair logs are stored in:
+   <code>onpolicy/scripts/results/MPE/simple_spread/mappo/&lt;experiment_name&gt;/run&lt;N&gt;/</code></li>
+<li><code>models/</code>: Checkpoints saved periodically (<code>checkpoint_1958400/</code>, <code>checkpoint_accepted_comm/</code>, <code>checkpoint_accepted_lora/</code>).</li>
+<li><code>eval_reward.csv</code>: Rollout evaluation returns over training steps.</li>
+<li><code>causal_influence.csv</code>: Longitudinal tracking of $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$0 reward drops, Policy KL divergence, and Value Sensitivity.</li>
+<li><code>summary.json</code>: Detailed parameters, environment metadata, and total elapsed duration.</li>
+<li><strong>Interactive UI Visualization</strong>:</li>
+<li>Navigate to the <strong>Runs</strong> tab in the web dashboard.</li>
+<li>Click on any completed run to view training curves, loss dynamics, and causal influence plots.</li>
+<li>Go to the <strong>Repair Dashboard</strong> to view the <strong>Pre-Break Baseline</strong>, <strong>Post-Break Degraded</strong>, and <strong>Post-Repair</strong> fingerprint metrics, along with rollback logs and the <strong>Held-Out Validation Badge</strong>.</li>
+</ol>
+<hr />
+<h2 id="4-the-complete-training-algorithm-mappo-emergent-communication">4. The Complete Training Algorithm (MAPPO + Emergent Communication)</h2>
+<h3 id="41-multi-agent-actor-critic-setup">4.1 Multi-Agent Actor-Critic Setup</h3>
+<p>The platform operates on decentralized partially observable Markov decision processes (Dec-POMDP). In <strong>MPE simple_spread</strong>, $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$1 agents must coordinate to navigate and cover $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$2 landmarks while minimizing collisions.</p>
+<ul>
+<li><strong>Local Observation ($$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$3)</strong>: Agent velocity (2D), self-position (2D), relative landmark positions ($$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$4), and relative other-agent positions ($$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$5), plus communication state.</li>
+<li><strong>Centralized Critic State ($$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$6)</strong>: Concatenation of all agents' local observations.</li>
+</ul>
+<h3 id="42-network-architecture-and-information-flow">4.2 Network Architecture and Information Flow</h3>
+<div class="codehilite"><pre><span></span><code><span class="w">              </span><span class="err">┌────────────────────────────────────────────────────────────┐</span>
+<span class="w">              </span><span class="err">│</span><span class="w">                     </span><span class="n">Agent</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="n">Observation</span><span class="w">                    </span><span class="err">│</span>
+<span class="w">              </span><span class="err">└──────────────┬──────────────────────────────┬──────────────┘</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="w">                             </span><span class="err">▼</span><span class="w">                              </span><span class="err">▼</span>
+<span class="w">                 </span><span class="err">┌───────────────────────┐</span><span class="w">      </span><span class="err">┌───────────────────────┐</span>
+<span class="w">                 </span><span class="err">│</span><span class="w">     </span><span class="n">Base</span><span class="w"> </span><span class="n">MLP</span><span class="w"> </span><span class="n">Trunk</span><span class="w">    </span><span class="err">│</span><span class="w">      </span><span class="err">│</span><span class="w">     </span><span class="n">Message</span><span class="w"> </span><span class="n">Head</span><span class="w">      </span><span class="err">│</span>
+<span class="w">                 </span><span class="err">│</span><span class="w">   </span><span class="p">(</span><span class="n">Dense</span><span class="w"> </span><span class="n">Embeddings</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">      </span><span class="err">│</span><span class="w"> </span><span class="p">(</span><span class="n">Softmax</span><span class="w"> </span><span class="n">Logits</span><span class="o">/</span><span class="n">Gumbel</span><span class="p">)</span><span class="err">│</span>
+<span class="w">                 </span><span class="err">└───────────┬───────────┘</span><span class="w">      </span><span class="err">└───────────┬───────────┘</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span><span class="w"> </span><span class="n">Token</span><span class="w"> </span><span class="n">index</span><span class="w"> </span><span class="n">m_i</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">▼</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">┌───────────────────────┐</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">    </span><span class="n">Token</span><span class="w"> </span><span class="n">Embedding</span><span class="w">    </span><span class="err">│</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">   </span><span class="p">(</span><span class="n">Semantic</span><span class="w"> </span><span class="n">Vector</span><span class="p">)</span><span class="w">   </span><span class="err">│</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">└───────────┬───────────┘</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span><span class="w"> </span><span class="n">Vector</span><span class="w"> </span><span class="n">c_i</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">R</span><span class="o">^</span><span class="mh">64</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">▼</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">┌───────────────────────┐</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">  </span><span class="n">Attention</span><span class="w"> </span><span class="n">Aggregator</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="o">&lt;</span><span class="err">──</span><span class="w"> </span><span class="n">Peer</span><span class="w"> </span><span class="n">Message</span><span class="w"> </span><span class="n">c_j</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w"> </span><span class="p">(</span><span class="n">Softmax</span><span class="w"> </span><span class="n">peer</span><span class="w"> </span><span class="n">weights</span><span class="p">)</span><span class="err">│</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                  </span><span class="err">└───────────┬───────────┘</span>
+<span class="w">                             </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span><span class="w"> </span><span class="n">Context</span><span class="w"> </span><span class="n">vector</span><span class="w"> </span><span class="n">h_comm</span>
+<span class="w">                             </span><span class="err">▼</span><span class="w">                              </span><span class="err">▼</span>
+<span class="w">                 </span><span class="err">┌──────────────────────────────────────────────────────┐</span>
+<span class="w">                 </span><span class="err">│</span><span class="w">                 </span><span class="n">Action</span><span class="w"> </span><span class="n">Decoding</span><span class="w"> </span><span class="n">Head</span><span class="w">                 </span><span class="err">│</span>
+<span class="w">                 </span><span class="err">│</span><span class="w">              </span><span class="p">(</span><span class="n">Physical</span><span class="w"> </span><span class="n">Movement</span><span class="w"> </span><span class="n">Action</span><span class="p">)</span><span class="w">              </span><span class="err">│</span>
+<span class="w">                 </span><span class="err">└──────────────────────────────────────────────────────┘</span>
+</code></pre></div>
+
+<ol>
+<li><strong>Message Generation (<code>message_head</code>)</strong>:
+   Agent $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$7 maps its local representation to a discrete token $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$8 with vocabulary size $$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$9.</li>
+<li><strong>Training</strong>: Uses Gumbel-Softmax with Straight-Through Estimator (STE) to enable end-to-end backpropagation through discrete messages.</li>
+<li><strong>Evaluation</strong>: Samples categorical tokens deterministically or via argmax.</li>
+<li><strong>Semantic Projection (<code>token_embedding</code>)</strong>:
+   The discrete token $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$0 indexes a learned embedding table $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$1 ($$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$2), yielding continuous semantic vector $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$3.</li>
+<li><strong>Multi-Agent Message Aggregation (<code>attention_weight</code> / <code>Attention</code>)</strong>:
+   Agent $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$4 receives peer messages $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$5 and computes multi-head attention weights $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$6:
+   $$\alpha_{ij} = \frac{\exp(\langle q_i, k_j \rangle / \sqrt{d})}{\sum_{k \neq i} \exp(\langle q_i, k_k \rangle / \sqrt{d})}, \quad h_{i,\text{comm}} = \sum_{j \neq i} \alpha_{ij} v_j$$</li>
+<li><strong>Centralized Value Function (<code>R_Critic</code>)</strong>:
+   Evaluates centralized state $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$7 alongside message representations to compute accurate baselines $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$8, stabilized by PopArt or ValueNorm running statistics.</li>
+</ol>
+<h3 id="43-ppo-policy-update">4.3 PPO Policy Update</h3>
+<p>The policy parameters $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$9 and value parameters $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$0 are optimized using clipped surrogate objective:
+$$L^{CLIP}(\theta) = \hat{\mathbb{E}}_t \left[ \min\left(r_t(\theta)\hat{A}_t, \, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t\right) \right]$$
+where $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$1 is computed via Generalized Advantage Estimation (GAE).</p>
+<hr />
+<h2 id="5-the-causal-mechanistic-layer">5. The Causal Mechanistic Layer</h2>
+<p>Rather than assuming communication helps simply because agents transmit tokens, the <strong>Causal Mechanistic Layer</strong> directly measures the causal effect of communication on policy actions and expected values using <strong>Pearl's $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$2-calculus</strong>.</p>
+<h3 id="51-common-random-numbers-crn-harness">5.1 Common Random Numbers (CRN) Harness</h3>
+<p>To eliminate confounding environmental variance between paired rollouts:
+- Every causal evaluation episode $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$3 is executed under an identical deterministic initial state seed $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$4.
+- Landmark positions, initial agent placements, and physical dynamics are bit-for-bit identical across all compared interventions.</p>
+<h3 id="52-interventional-operators-mathblockplaceholder35-interventions">5.2 Interventional Operators ($$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$5-Interventions)</h3>
+<p>The system executes four distinct interventions:</p>
+<table>
+<thead>
+<tr>
+<th>Intervention</th>
+<th>Description</th>
+<th>Mechanistic Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>$$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$6</strong></td>
+<td>Standard unperturbed execution with active communication.</td>
+<td>Baseline reference</td>
+</tr>
+<tr>
+<td><strong>$$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$7</strong></td>
+<td>Incoming message vector $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$8 is clamped to zero ($$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$9).</td>
+<td>Complete communication ablation</td>
+</tr>
+<tr>
+<td><strong>$$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$0</strong></td>
+<td>Injects $$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$1 into the transmitted message channel.</td>
+<td>Channel noise robustness</td>
+</tr>
+<tr>
+<td><strong>$$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$2</strong></td>
+<td>Messages are randomly permuted among peers.</td>
+<td>Specificity of partner identity</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-diagnostic-causal-fingerprint-metrics">5.3 Diagnostic Causal Fingerprint Metrics</h3>
+<ol>
+<li><strong>Causal Communication Benefit ($$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$3)</strong>:
+   $$\text{comm\_effect} = \mathbb{E}_{\text{CRN}} \left[ R_{do(\text{normal})} - R_{do(\text{no\_messages})} \right]$$
+   Directly measures the gain in task reward produced specifically by the communication channel.</li>
+<li><strong>Causal Influence on Value ($$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$4)</strong>:
+   $$\text{Value Sensitivity} = \mathbb{E}_{s \sim \pi} \left[ |V(s, \mathbf{c}) - V(s, \mathbf{0})| \right]$$
+   Measures how much the centralized critic shifts its expected return prediction when messages are removed at state $$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$5.</li>
+<li><strong>Causal Influence on Policy ($$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$6)</strong>:
+   $$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$
+   Measures the behavioral divergence in action probabilities caused by receiving peer messages.</li>
+</ol>
+<blockquote>
+<p><strong>Crucial Discovery</strong>: Under distribution shift, Policy KL often remains high while $$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$7 collapses to zero or becomes negative. This proves agents are still reacting to distorted messages, but the semantic meaning is corrupt.</p>
+</blockquote>
+<hr />
+<h2 id="6-the-online-repair-mechanism">6. The Online Repair Mechanism</h2>
+<h3 id="61-distribution-shift-observation-mirroring">6.1 Distribution Shift: Observation Mirroring</h3>
+<p>To systematically test protocol breakdown, the environment wraps observations with <code>MirrorObsVecEnv</code>. Under <code>partner_full</code>, the relative coordinates of partner agents are inverted ($$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$8). This leaves self-navigation intact but corrupts mutual belief about partner locations.</p>
+<h3 id="62-dual-gated-degradation-detection">6.2 Dual-Gated Degradation Detection</h3>
+<p>The Phase 2 detector triggers repair <strong>only</strong> when both task performance and communication utility fail:</p>
+<p>$$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$</p>
+<p>Where:
+- $$\text{Policy KL} = \mathbb{E}_{s \sim \pi} \left[ D_{KL}(\pi(\cdot | s, \mathbf{c}) \parallel \pi(\cdot | s, \mathbf{0})) \right]$$9 (Threshold $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$0)
+- $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$1</p>
+<div class="codehilite"><pre><span></span><code><span class="w">                    </span><span class="err">┌─────────────────────────┐</span>
+<span class="w">                    </span><span class="err">│</span><span class="w">  </span><span class="n">Reward</span><span class="w"> </span><span class="n">Drop</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">30</span><span class="o">%?</span><span class="w">   </span><span class="err">│</span>
+<span class="w">                    </span><span class="err">└───────────┬─────────────┘</span>
+<span class="w">                                </span><span class="err">│</span>
+<span class="w">                     </span><span class="nb">YES</span><span class="w"> </span><span class="err">───────┴───────</span><span class="w"> </span><span class="nb">NO</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="nb">NO</span><span class="w"> </span><span class="n">REPAIR</span><span class="w"> </span><span class="p">]</span>
+<span class="w">                      </span><span class="err">│</span>
+<span class="w">                      </span><span class="err">▼</span>
+<span class="w">         </span><span class="err">┌───────────────────────────────┐</span>
+<span class="w">         </span><span class="err">│</span><span class="w"> </span><span class="n">comm_effect</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">Threshold</span><span class="w"> </span><span class="n">OR</span><span class="w">    </span><span class="err">│</span>
+<span class="w">         </span><span class="err">│</span><span class="w"> </span><span class="n">Value</span><span class="w"> </span><span class="n">Sensitivity</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">0.5</span><span class="n">x</span><span class="w"> </span><span class="n">Base</span><span class="w"> </span><span class="err">│</span>
+<span class="w">         </span><span class="err">└────────────┬──────────────────┘</span>
+<span class="w">                      </span><span class="err">│</span>
+<span class="w">           </span><span class="nb">YES</span><span class="w"> </span><span class="err">───────┴───────</span><span class="w"> </span><span class="nb">NO</span><span class="w"> </span><span class="err">──</span><span class="o">&gt;</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="nb">NO</span><span class="w"> </span><span class="n">REPAIR</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">Reward</span><span class="w"> </span><span class="n">drop</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">physical</span><span class="p">,</span>
+<span class="w">            </span><span class="err">│</span><span class="w">                                         </span><span class="n">not</span><span class="w"> </span><span class="n">communication</span><span class="o">-</span><span class="n">related</span><span class="p">)</span>
+<span class="w">            </span><span class="err">▼</span>
+<span class="w">     </span><span class="p">[</span><span class="w"> </span><span class="n">TRIGGER</span><span class="w"> </span><span class="n">REPAIR</span><span class="w"> </span><span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h3 id="63-rule-based-adaptive-controller">6.3 Rule-Based Adaptive Controller</h3>
+<p>Instead of guessing which layers to fine-tune, the deterministic controller analyzes the fingerprint pattern:</p>
+<ol>
+<li><strong>Reward Collapsed Badly ($$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$2 drop)</strong>:</li>
+<li>Escalates immediately to parameter-efficient <strong><code>lora</code></strong> or <strong><code>full</code></strong> policy adaptation.</li>
+<li><strong>Value Sensitivity Dropped Sharply ($$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$3)</strong>:</li>
+<li>Starts minimally with <strong><code>embedding</code></strong> (re-learning token semantics while preserving policy trunk).</li>
+<li><strong>Standard Communication Breakdown</strong>:</li>
+<li>Selects <strong><code>comm</code></strong> (<code>token_embedding</code> + <code>message_head</code> + <code>attention_weight</code>).</li>
+</ol>
+<hr />
+<h3 id="64-bit-exact-snapshot-rollback-architecture">6.4 Bit-Exact Snapshot &amp; Rollback Architecture</h3>
+<p>Before initiating PPO fine-tuning iterations in the broken environment, the system creates a deep-copy snapshot of:
+- Actor network weights (<code>policy.actor.state_dict()</code>)
+- Critic network weights (<code>policy.critic.state_dict()</code>)
+- Attention weights (<code>policy.attention_weight</code>)
+- Actor &amp; Critic Adam optimizer momentum buffers (<code>exp_avg</code>, <code>exp_avg_sq</code>)
+- Value Normalizer running statistics (<code>trainer.value_normalizer</code>)</p>
+<p>If a repair attempt is rejected, the snapshot is restored <strong>bit-for-bit</strong>, preventing optimizer momentum poisoning during subsequent escalation attempts.</p>
+<hr />
+<h3 id="65-acceptance-gating-the-escalation-ladder">6.5 Acceptance Gating &amp; The Escalation Ladder</h3>
+<h4 id="normalized-recovery-metric">Normalized Recovery Metric:</h4>
+<p>$$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$</p>
+<p>A repair is accepted if and only if:
+$$\text{Recovery}(\text{Reward}) \ge 0.50 \quad \text{AND} \quad \text{Recovery}(\text{comm\_effect}) \ge 0.50$$</p>
+<h4 id="the-escalation-ladder">The Escalation Ladder:</h4>
+<div class="codehilite"><pre><span></span><code>  <span class="p">[</span> <span class="n">embedding</span> <span class="p">]</span> <span class="err">──</span><span class="n">rejected</span><span class="err">──</span><span class="o">&gt;</span> <span class="p">[</span> <span class="n">comm</span> <span class="p">]</span> <span class="err">──</span><span class="n">rejected</span><span class="err">──</span><span class="o">&gt;</span> <span class="p">[</span> <span class="n">lora</span> <span class="p">]</span> <span class="err">──</span><span class="n">rejected</span><span class="err">──</span><span class="o">&gt;</span> <span class="p">[</span> <span class="n">full</span> <span class="p">]</span> <span class="err">──</span><span class="n">rejected</span><span class="err">──</span><span class="o">&gt;</span> <span class="p">[</span> <span class="n">RESTORE</span> <span class="o">&amp;</span> <span class="n">FAIL</span> <span class="p">]</span>
+        <span class="err">│</span>                           <span class="err">│</span>                       <span class="err">│</span>                      <span class="err">│</span>
+     <span class="n">accepted</span>                    <span class="n">accepted</span>                <span class="n">accepted</span>               <span class="n">accepted</span>
+        <span class="err">▼</span>                           <span class="err">▼</span>                       <span class="err">▼</span>                      <span class="err">▼</span>
+  <span class="p">[</span> <span class="n">HELD</span><span class="o">-</span><span class="kr">OUT</span> <span class="n">VALIDATION</span> <span class="n">CHECK</span> <span class="n">ON</span> <span class="n">INDEPENDENT</span> <span class="n">SEEDS</span> <span class="p">]</span> <span class="err">──</span><span class="o">&gt;</span> <span class="p">[</span> <span class="n">PERSIST</span> <span class="n">CHECKPOINT</span> <span class="kr">TO</span> <span class="n">DISK</span> <span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h3 id="66-held-out-generalization-validation">6.6 Held-Out Generalization Validation</h3>
+<p>When an attempt passes acceptance, the runner evaluates the repaired policy on a <strong>completely disjoint set of random seeds (CRN block)</strong>.
+- If recovery is confirmed on held-out episodes: Emits <code>HELD-OUT CONFIRMS</code> and saves <code>checkpoint_accepted_&lt;target&gt;/</code>.
+- If it fails on held-out episodes: Rejects the fix, rolls back, and flags the run as an overfitted artifact.</p>
+<hr />
+<h2 id="7-the-parameter-efficient-lora-low-rank-adaptation-method">7. The Parameter-Efficient LoRA (Low-Rank Adaptation) Method</h2>
+<h3 id="71-mathematical-formulation">7.1 Mathematical Formulation</h3>
+<p>When observation shifts are severe, updating only the communication embeddings (<code>embedding</code> / <code>comm</code>) is insufficient, but full actor fine-tuning (<code>full</code>) risks catastrophic forgetting on unbroken tasks.</p>
+<p>The <strong>LoRA layer</strong> (<code>LoRALinear</code> in <code>onpolicy/algorithms/utils/lora.py</code>) wraps dense linear layers $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$4 with a low-rank decomposition:</p>
+<p>$$h = W_0 x + \Delta W x = W_0 x + \frac{\alpha}{r} (B \cdot A) x$$</p>
+<p>Where:
+- $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$5 is initialized with Kaiming uniform distribution ($$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$6).
+- $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$7 is initialized to <strong>zeros</strong>, ensuring $$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$8 at initialization ($$\text{Trigger Repair} \iff (\text{Reward Drop Ratio} \ge \tau_r) \land \left( \text{comm\_effect} < \text{Threshold}_{\text{comm}} \lor \text{Value Sensitivity} < 0.5 \times \text{Baseline} \right)$$9).
+- $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$0 is the adaptation rank (e.g., $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$1).
+- $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$2 is the constant scaling factor (e.g., $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$3, yielding scaling $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$4).</p>
+<div class="codehilite"><pre><span></span><code>                      Input Vector x in R^{d_in}
+                           │            │
+              ┌────────────┘            └────────────┐
+              │                                      │
+              ▼                                      ▼
+     ┌──────────────────┐                   ┌──────────────────┐
+     │  Frozen Base W0  │                   │    Matrix A      │ (Rank r x d_in)
+     │ (No Gradients)   │                   └────────┬─────────┘
+     └────────┬─────────┘                            │
+              │                                      ▼
+              │                             ┌──────────────────┐
+              │                             │    Matrix B      │ (Rank d_out x r)
+              │                             └────────┬─────────┘
+              │                                      │
+              │                                      ▼
+              │                             [ Scaling factor alpha/r ]
+              │                                      │
+              ▼                                      ▼
+              ( + ) &lt;────────────────────────────────┘
+              │
+              ▼
+       Output Vector h in R^{d_out}
+</code></pre></div>
+
+<h3 id="72-dynamic-injection-parameter-freezing">7.2 Dynamic Injection &amp; Parameter Freezing</h3>
+<ul>
+<li><strong>Injection (<code>inject_lora_to_actor</code>)</strong>: Recursively replaces dense feedforward layers in <code>base.mlp.fc1</code>, <code>base.mlp.fc2</code>, and action decoders <code>act.action_out</code> with <code>LoRALinear</code> wrappers while retaining original weights.</li>
+<li><strong>Selective Training (<code>set_actor_lora_trainable</code>)</strong>: Freezes all base actor parameters and enables gradients strictly for:</li>
+<li>LoRA adapter matrices $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$5 and $$\text{Recovery}(M) = \frac{M_{\text{repaired}} - M_{\text{degraded}}}{M_{\text{baseline}} - M_{\text{degraded}}}$$6 across all dense layers.</li>
+<li>Communication pathway layers (<code>token_embedding</code>, <code>message_head</code>, <code>attention_weight</code>).</li>
+<li>Centralized Critic parameters (to keep value estimation calibrated).</li>
+</ul>
+<h3 id="73-zero-overhead-inference-merging">7.3 Zero-Overhead Inference Merging</h3>
+<p>When deployed, LoRA weights can be folded directly into the base weights with zero additional latency:
+$$W_{\text{deployed}} = W_0 + \frac{\alpha}{r} (B \cdot A)$$</p>
+<hr />
+<h2 id="8-summary-comparison-of-repair-modes">8. Summary Comparison of Repair Modes</h2>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Trainable Parameters</th>
+<th>Description</th>
+<th>Primary Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>embedding</code></strong></td>
+<td><code>token_embedding</code></td>
+<td>Re-learns semantic meaning of discrete tokens; leaves policy trunk and message head frozen.</td>
+<td>Minimal surgical repair when token vocabulary shifts.</td>
+</tr>
+<tr>
+<td><strong><code>comm</code></strong></td>
+<td><code>token_embedding</code>, <code>message_head</code>, <code>attention_weight</code></td>
+<td>Re-learns both what to send, what tokens mean, and peer attention weights.</td>
+<td>Standard communication failure mode.</td>
+</tr>
+<tr>
+<td><strong><code>lora</code></strong></td>
+<td>LoRA adapters on MLP trunk + Action heads + <code>comm</code> pathway</td>
+<td>Parameter-efficient low-rank adaptation of feature extractors while freezing base weights.</td>
+<td>Moderate to severe shifts; preserves pre-trained policies without catastrophic forgetting.</td>
+</tr>
+<tr>
+<td><strong><code>full</code></strong></td>
+<td>Entire Actor network + <code>attention_weight</code></td>
+<td>Full policy retraining on perturbed environment.</td>
+<td>Complete task and observation breakdown.</td>
+</tr>
+<tr>
+<td><strong><code>noncomm</code></strong></td>
+<td><code>act.action_out</code> only (Control Arm)</td>
+<td>Trains action decoder without modifying communication layers.</td>
+<td>Scientific baseline: proves recovery requires fixing communication.</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

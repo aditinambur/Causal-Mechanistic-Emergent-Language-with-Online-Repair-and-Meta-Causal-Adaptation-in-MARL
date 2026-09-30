@@ -30,7 +30,7 @@ export interface RunConfig {
 export interface RepairConfig {
   checkpoint_name: string;
   mirror_scope: 'partner_full' | 'partner' | 'all';
-  repair_target: 'auto' | 'embedding' | 'comm' | 'full' | 'noncomm';
+  repair_target: 'auto' | 'embedding' | 'comm' | 'lora' | 'full' | 'noncomm';
   controller: 'causal' | 'reward_only';
   measure_episodes: number;
   repair_iters: number;

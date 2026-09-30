@@ -807,6 +807,39 @@ def main(args):
     if all_args.model_dir is None:
         raise ValueError("--model_dir is required (path to a trained actor.pt/critic.pt).")
 
+    # Auto-detect num_agents and num_landmarks from checkpoint and CSV if present
+    actor_candidates = [
+        os.path.join(str(all_args.model_dir), "actor.pt"),
+        os.path.join(str(all_args.model_dir), "checkpoint_best", "actor.pt")
+    ]
+    actor_path = next((p for p in actor_candidates if os.path.exists(p)), None)
+    if actor_path:
+        try:
+            sd = torch.load(actor_path, map_location="cpu")
+            # Look for causal_influence.csv
+            csv_candidates = [
+                os.path.join(str(all_args.model_dir), "..", "causal_influence.csv"),
+                os.path.join(str(all_args.model_dir), "causal_influence.csv"),
+                os.path.join(str(all_args.model_dir), "..", "..", "causal_influence.csv")
+            ]
+            for cp in csv_candidates:
+                if cp and os.path.exists(cp):
+                    with open(cp, "r") as f:
+                        header = f.readline().strip().split(",")
+                        agent_cols = [c for c in header if c.startswith("causal_influence_kl_agent")]
+                        if agent_cols:
+                            all_args.num_agents = len(agent_cols)
+                            break
+
+            if "message_head.weight" in sd:
+                obs_dim = sd["message_head.weight"].shape[1]
+                calc_landmarks = (obs_dim - 4 - 4 * (all_args.num_agents - 1)) // 2
+                if calc_landmarks > 0:
+                    all_args.num_landmarks = calc_landmarks
+            print(f"[REPAIR] Auto-configured for checkpoint: num_agents={all_args.num_agents}, num_landmarks={all_args.num_landmarks}")
+        except Exception as e:
+            print(f"[REPAIR WARNING] Checkpoint shape inspection error: {e}")
+
     # CRN pairing is what makes comm_effect trustworthy at 6-8 episodes: every condition is
     # forced to start from the identical layout. It is implemented by _seed_eval_envs(), which
     # can only reseed the CURRENT process's global NumPy RNG -- the vec envs expose no seed()

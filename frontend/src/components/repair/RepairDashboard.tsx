@@ -32,7 +32,7 @@ export const RepairDashboard: React.FC<RepairDashboardProps> = ({
     checkpoints[0]?.name || 'checkpoint_best'
   );
   const [mirrorScope, setMirrorScope] = useState<'partner_full' | 'partner' | 'all'>('partner_full');
-  const [repairTarget, setRepairTarget] = useState<'auto' | 'embedding' | 'comm' | 'full' | 'noncomm'>('auto');
+  const [repairTarget, setRepairTarget] = useState<'auto' | 'embedding' | 'comm' | 'lora' | 'full' | 'noncomm'>('auto');
   const [controller, setController] = useState<'causal' | 'reward_only'>('causal');
   const [measureEpisodes, setMeasureEpisodes] = useState<number>(6);
   const [repairIters, setRepairIters] = useState<number>(15);
@@ -113,7 +113,8 @@ export const RepairDashboard: React.FC<RepairDashboardProps> = ({
                 onChange={(e) => setRepairTarget(e.target.value as any)}
                 className="form-select"
               >
-                <option value="auto">auto (Adaptive Controller: embedding → comm → full)</option>
+                <option value="auto">auto (Adaptive Controller: embedding → comm → lora → full)</option>
+                <option value="lora">lora (Parameter-Efficient LoRA Adapters on Actor Trunk)</option>
                 <option value="embedding">embedding only (~320 params, word meanings)</option>
                 <option value="comm">comm only (message_head + token_embedding + attention_weight)</option>
                 <option value="full">full (entire actor policy network)</option>
