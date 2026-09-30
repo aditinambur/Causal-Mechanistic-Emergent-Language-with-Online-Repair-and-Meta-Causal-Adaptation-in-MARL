@@ -19,3 +19,4 @@ logs
 *.gz
 node_modules/
 frontend/dist/
+.venv/
