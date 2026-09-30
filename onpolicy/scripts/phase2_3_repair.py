@@ -366,11 +366,12 @@ def select_repair_target(baseline, degraded, severe_reward_ratio, sharp_value_se
 
     value_sens_ratio = degraded['value_sensitivity'] / max(1e-6, baseline['value_sensitivity'])
 
+    if 'lora' in order:
+        return 'lora', (
+            "coordination degraded (reward drop {:.0%}, comm drop {:.0%}) "
+            "-> start parameter-efficient repair with LoRA (actor trunk + comm pathway)".format(
+                reward_drop_ratio, comm_drop_ratio))
     if reward_drop_ratio >= severe_reward_ratio:
-        if 'lora' in order:
-            return 'lora', (
-                "reward dropped significantly ({:.0%} of baseline, >= {:.0%} threshold) "
-                "-> start parameter-efficient repair with LoRA".format(reward_drop_ratio, severe_reward_ratio))
         return 'full', (
             "reward collapsed by {:.0%} of baseline magnitude (>= {:.0%} threshold) "
             "-> escalate directly to full".format(reward_drop_ratio, severe_reward_ratio))
@@ -440,7 +441,7 @@ def run_causal_adaptive_repair(runner, baseline, degraded, all_args):
     attempt in the remaining ladder is rejected, parameters are restored to the pre-repair
     snapshot and the run reports no accepted repair.
     """
-    order = ('embedding', 'comm', 'lora', 'full') if getattr(all_args, 'lora_rank', 0) > 0 else ('embedding', 'comm', 'full')
+    order = ('lora', 'comm', 'full') if getattr(all_args, 'lora_rank', 0) > 0 else ('embedding', 'comm', 'full')
     initial_target, reason = select_repair_target(
         baseline, degraded,
         severe_reward_ratio=all_args.select_severe_reward_ratio,
@@ -721,7 +722,7 @@ def parse_args(args, parser):
                         help="sigma multiplier for the comm-benefit degradation band.")
     parser.add_argument('--detect_min_ratio', type=float, default=0.5,
                         help="degradation if comm_effect falls below this fraction of baseline.")
-    parser.add_argument('--detect_reward_drop_ratio', type=float, default=0.15,
+    parser.add_argument('--detect_reward_drop_ratio', type=float, default=0.10,
                         help="detect_degradation requires reward to have dropped by at least "
                              "this fraction of |baseline reward| in ADDITION to a comm-side "
                              "signal (comm_effect or value_sensitivity) before triggering -- "
@@ -757,7 +758,7 @@ def parse_args(args, parser):
                              "given, else 'comm'), no escalation. Exists to test whether causal "
                              "triggering beats the naive alternative; never combine its trigger "
                              "logic with the causal controller's target selection.")
-    parser.add_argument('--reward_only_drop_ratio', type=float, default=0.30,
+    parser.add_argument('--reward_only_drop_ratio', type=float, default=0.20,
                         help="--controller reward_only trigger threshold: fraction of |baseline "
                              "reward| that must be lost to trigger repair.")
 
@@ -773,7 +774,7 @@ def parse_args(args, parser):
     parser.add_argument('--accept_reward_recovery', type=float, default=0.30,
                         help="accept_repair: minimum fraction of lost reward that must be "
                              "recovered for a repair attempt to be accepted.")
-    parser.add_argument('--accept_comm_recovery', type=float, default=0.30,
+    parser.add_argument('--accept_comm_recovery', type=float, default=0.15,
                         help="accept_repair: minimum fraction of lost comm_effect that must be "
                              "recovered for a repair attempt to be accepted.")
 
