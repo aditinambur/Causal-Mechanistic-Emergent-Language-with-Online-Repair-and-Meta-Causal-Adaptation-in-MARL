@@ -1,5 +1,5 @@
 __pycache__
-results
+/results/
 *.pyc
 /gifs/
 build
@@ -20,3 +20,9 @@ logs
 node_modules/
 frontend/dist/
 .venv/
+*.pt
+onpolicy/scripts/results/
+
+# Whitelist benchmarking outputs and publication plots
+!benchmarking/data/results/**
+!benchmarking/visualizations/plots/**
