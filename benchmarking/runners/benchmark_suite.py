@@ -39,6 +39,7 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
     Accurately extracts baseline, degraded, repaired (including [REPAIRED[target]]),
     controller decisions, acceptance, and held-out validation.
     """
+    lines = log_text.splitlines()
     res = {
         "baseline_reward": None,
         "baseline_no_msg_reward": None,
@@ -65,11 +66,23 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
         "heldout_reward_recovery": None,
         "heldout_comm_recovery": None,
         "normal_reward_retention_loss": None,
+        "causal_attribution_ratio": None,
+        "causal_evidence_score": None,
+        "decision_summary": None,
     }
 
-    lines = log_text.splitlines()
+    in_heldout = False
+    in_retention = False
+
     for line in lines:
         line_s = line.strip()
+
+        if "[5] Retention check" in line_s:
+            in_retention = True
+            in_heldout = False
+        elif "[6] Held-out re-check" in line_s:
+            in_heldout = True
+            in_retention = False
 
         # 1. Baseline fingerprint
         if "[BASELINE]" in line_s:
@@ -82,7 +95,9 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
                     try: res["baseline_no_msg_reward"] = float(p.split("=")[1])
                     except: pass
                 elif p.startswith("comm_effect="):
-                    try: res["baseline_comm_effect"] = float(p.split("=")[1].split("±")[0])
+                    try:
+                        m = re.search(r"[-+]?\d*\.?\d+", p.split("=")[1])
+                        if m: res["baseline_comm_effect"] = float(m.group(0))
                     except: pass
                 elif p.startswith("value_sens="):
                     try: res["baseline_value_sens"] = float(p.split("=")[1])
@@ -102,7 +117,9 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
                     try: res["degraded_no_msg_reward"] = float(p.split("=")[1])
                     except: pass
                 elif p.startswith("comm_effect="):
-                    try: res["degraded_comm_effect"] = float(p.split("=")[1].split("±")[0])
+                    try:
+                        m = re.search(r"[-+]?\d*\.?\d+", p.split("=")[1])
+                        if m: res["degraded_comm_effect"] = float(m.group(0))
                     except: pass
                 elif p.startswith("value_sens="):
                     try: res["degraded_value_sens"] = float(p.split("=")[1])
@@ -117,15 +134,30 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
         elif "ENVIRONMENT CHANGE NOT detected" in line_s:
             res["detector_fired"] = False
 
-        if "reward drop ratio:" in line_s:
+        if "reward drop ratio:" in line_s or "reward drop ratio" in line_s:
             try:
-                val = line_s.split("reward drop ratio:")[1].split("(")[0].strip()
+                val = line_s.split("reward drop ratio")[1].split(":")[1].split("(")[0].strip()
                 res["reward_drop_ratio"] = float(val)
             except: pass
 
         if "selected repair target:" in line_s:
             try:
                 res["repair_target"] = line_s.split("selected repair target:")[1].strip()
+            except: pass
+
+        if "causal attribution ratio" in line_s:
+            try:
+                res["causal_attribution_ratio"] = float(line_s.split(":")[1].split("(")[0].strip())
+            except: pass
+
+        if "causal evidence score" in line_s:
+            try:
+                res["causal_evidence_score"] = float(line_s.split(":")[1].split("(")[0].strip())
+            except: pass
+
+        if "decision summary" in line_s:
+            try:
+                res["decision_summary"] = line_s.split("decision summary")[1].split(":", 1)[1].strip()
             except: pass
 
         # 4. Repaired fingerprint (matches both [REPAIRED] and [REPAIRED[target]])
@@ -136,7 +168,9 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
                     try: res["repaired_reward"] = float(p.split("=")[1])
                     except: pass
                 elif p.startswith("comm_effect="):
-                    try: res["repaired_comm_effect"] = float(p.split("=")[1].split("±")[0])
+                    try:
+                        m = re.search(r"[-+]?\d*\.?\d+", p.split("=")[1])
+                        if m: res["repaired_comm_effect"] = float(m.group(0))
                     except: pass
                 elif p.startswith("value_sens="):
                     try: res["repaired_value_sens"] = float(p.split("=")[1])
@@ -146,18 +180,24 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
                     except: pass
 
         # 5. Recovery percentages
-        if "reward recovery:" in line_s:
+        if "reward recovery" in line_s and ":" in line_s:
             try:
-                val = line_s.split("reward recovery:")[1].strip().replace("%", "")
+                val = line_s.split(":")[-1].strip().replace("%", "")
                 if "n/a" not in val.lower():
-                    res["reward_recovery_pct"] = float(val)
+                    if in_heldout:
+                        res["heldout_reward_recovery"] = float(val)
+                    else:
+                        res["reward_recovery_pct"] = float(val)
             except: pass
 
-        if "communication recovery:" in line_s:
+        if "communication recovery" in line_s and ":" in line_s:
             try:
-                val = line_s.split("communication recovery:")[1].strip().replace("%", "")
+                val = line_s.split(":")[-1].strip().replace("%", "")
                 if "n/a" not in val.lower():
-                    res["comm_recovery_pct"] = float(val)
+                    if in_heldout:
+                        res["heldout_comm_recovery"] = float(val)
+                    else:
+                        res["comm_recovery_pct"] = float(val)
             except: pass
 
         # 6. Acceptance decisions
@@ -169,23 +209,26 @@ def parse_phase2_3_output(log_text: str) -> Dict[str, Any]:
         elif "all repair attempts rejected" in line_s:
             res["repair_decision"] = "REJECTED"
 
-        # 7. Held-out validation
-        if "held-out validation:" in line_s:
-            if "CONFIRMS" in line_s:
-                res["heldout_validation"] = "CONFIRMED"
-            elif "FAILS" in line_s or "REJECTS" in line_s:
-                res["heldout_validation"] = "REJECTED"
+        # 7. Held-out validation confirmation
+        if "HELD-OUT CONFIRMS" in line_s:
+            res["heldout_validation"] = "CONFIRMED"
+        elif "HELD-OUT DOES NOT CONFIRM" in line_s or "HELD-OUT FAILS" in line_s or "HELD-OUT REJECTS" in line_s:
+            res["heldout_validation"] = "FAILED"
 
-        if "heldout reward recovery" in line_s:
-            try:
-                val = line_s.split(":")[-1].strip().replace("%", "")
-                res["heldout_reward_recovery"] = float(val)
-            except: pass
+        # 8. Retention check
+        if in_retention and "vs. baseline on the SAME layouts:" in line_s:
+            if "(" in line_s and "% of |baseline|)" in line_s:
+                try:
+                    pct_str = line_s.split("(")[1].split("%")[0].strip()
+                    res["normal_reward_retention_loss"] = float(pct_str)
+                except: pass
 
-        if "retention drop on normal env" in line_s or "normal_reward_delta" in line_s:
-            try:
-                res["normal_reward_retention_loss"] = float(line_s.split(":")[-1].strip())
-            except: pass
+    # If repaired_reward is accepted, recompute reward_recovery_pct if missing or discrepant
+    if res["repair_decision"] == "ACCEPTED" and res["repaired_reward"] is not None:
+        if res["baseline_reward"] is not None and res["degraded_reward"] is not None:
+            lost = res["baseline_reward"] - res["degraded_reward"]
+            if abs(lost) > 1e-6 and res["reward_recovery_pct"] is None:
+                res["reward_recovery_pct"] = round(((res["repaired_reward"] - res["degraded_reward"]) / lost) * 100.0, 1)
 
     return res
 
@@ -264,6 +307,7 @@ def run_benchmarks(
     seeds: List[int],
     repair_iters: int = 15,
     measure_episodes: int = 6,
+    holdout_episodes: int = 6,
     output_prefix: str = "benchmark_master"
 ):
     """Run full benchmarking matrix across scales, arms, and seeds."""
@@ -306,6 +350,7 @@ def run_benchmarks(
                     "--model_dir", str(ckpt),
                     "--mirror_scope", scale_cfg.get("mirror_scope", "partner_full"),
                     "--measure_episodes", str(measure_episodes),
+                    "--holdout_episodes", str(holdout_episodes),
                     "--repair_iters", str(repair_iters),
                     "--controller", arm_cfg["controller"],
                     "--lora_rank", str(EVAL_CONFIG["lora_rank"]),
@@ -350,8 +395,9 @@ def run_benchmarks(
                     json.dump(all_results, f, indent=2)
 
                 if all_results:
+                    fieldnames = list(dict.fromkeys([k for r in all_results for k in r.keys()]))
                     with open(csv_file, "w", newline="") as f:
-                        writer = csv.DictWriter(f, fieldnames=list(all_results[0].keys()))
+                        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                         writer.writeheader()
                         writer.writerows(all_results)
 
@@ -371,6 +417,7 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=[1, 2, 3, 4, 5], help="Seeds to evaluate")
     parser.add_argument("--repair_iters", type=int, default=15, help="Number of repair iterations")
     parser.add_argument("--measure_episodes", type=int, default=6, help="Number of CRN-paired episodes")
+    parser.add_argument("--holdout_episodes", type=int, default=6, help="Number of fresh held-out episodes")
     parser.add_argument("--output_prefix", type=str, default="benchmark_master", help="Output file prefix")
     args = parser.parse_args()
 
@@ -380,6 +427,7 @@ def main():
         seeds=args.seeds,
         repair_iters=args.repair_iters,
         measure_episodes=args.measure_episodes,
+        holdout_episodes=args.holdout_episodes,
         output_prefix=args.output_prefix
     )
 

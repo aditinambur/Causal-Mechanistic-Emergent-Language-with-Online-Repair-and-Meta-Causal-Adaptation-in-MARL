@@ -62,19 +62,48 @@ for r in orig_records:
     }
     unified.append(norm)
 
-# Add any new runs that were performed in benchmark_master
-existing_ids = {r.get("run_id") for r in unified}
+def reconcile_record(norm):
+    """
+    Ensure mathematical reconciliation across recovery percentages:
+    recovery = (repaired - degraded) / (baseline - degraded)
+    Fixes discrepancies where recorded percentage diverges from reported raw rewards.
+    """
+    if (norm.get("repaired_reward") is not None and
+        norm.get("baseline_reward") is not None and
+        norm.get("degraded_reward") is not None):
+        lost_rew = norm["baseline_reward"] - norm["degraded_reward"]
+        if abs(lost_rew) > 1e-6:
+            norm["reward_recovery_pct"] = round(
+                ((norm["repaired_reward"] - norm["degraded_reward"]) / lost_rew) * 100.0, 1
+            )
+
+    if (norm.get("repaired_comm_effect") is not None and
+        norm.get("baseline_comm_effect") is not None and
+        norm.get("degraded_comm_effect") is not None):
+        lost_comm = norm["baseline_comm_effect"] - norm["degraded_comm_effect"]
+        if lost_comm > 1e-6:
+            norm["comm_recovery_pct"] = round(
+                ((norm["repaired_comm_effect"] - norm["degraded_comm_effect"]) / lost_comm) * 100.0, 1
+            )
+    return norm
+
+# Reconcile all records
+unified = [reconcile_record(r) for r in unified]
+existing_records = [reconcile_record(r) for r in existing_records]
+
+master_dict = {r["run_id"]: r for r in unified}
 for r in existing_records:
-    if r.get("run_id") not in existing_ids:
-        unified.append(r)
+    master_dict[r["run_id"]] = r
+unified = list(master_dict.values())
 
 dest_json.parent.mkdir(parents=True, exist_ok=True)
 with open(dest_json, "w") as f:
     json.dump(unified, f, indent=2)
 
 if unified:
+    fieldnames = list(dict.fromkeys([k for r in unified for k in r.keys()]))
     with open(dest_csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(unified[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(unified)
 

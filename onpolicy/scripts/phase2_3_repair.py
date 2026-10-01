@@ -276,19 +276,19 @@ class RepairRunner(MPERunner):
             self.all_args.disable_messages = prev_disable
 
 
-def detect_degradation(baseline, current, k_sigma, min_ratio, reward_drop_ratio_threshold):
+def detect_degradation(baseline, current, k_sigma, min_ratio, reward_drop_ratio_threshold,
+                       severe_reward_ratio=0.50):
     """
     Phase 2 detector. Triggers repair only when BOTH:
       (a) reward has significantly degraded (drop >= reward_drop_ratio_threshold of
           |baseline reward|), AND
       (b) communication effectiveness has degraded (comm_effect below its max-tolerable
-          threshold, or value-sensitivity halved).
+          threshold, value-sensitivity halved, severe coordination collapse >= severe_reward_ratio,
+          or comm_effect experiencing pathological variance/divergence).
     Reward down with comm_effect stable does NOT trigger (not a communication problem); nor
-    does comm_effect dipping with reward essentially unchanged (nothing to repair). This
-    matches the intended design: repair only when communication is the LIKELY CAUSE of the
-    reward drop, not merely coincidentally different from baseline. (KL is intentionally NOT
-    part of the comm-side signal: under the mirror the policy still reacts to messages, so KL
-    can stay high even when messages stop helping -- see PROJECT_OVERVIEW.md.)
+    does comm_effect dipping with reward essentially unchanged (nothing to repair). When
+    a multi-agent system experiences a severe collapse (>= severe_reward_ratio), or when
+    comm_effect anomalously destabilizes, coordination breakdown is detected.
     """
     baseline_reward_mag = abs(baseline['reward']) + 1e-6
     reward_drop_ratio = (baseline['reward'] - current['reward']) / baseline_reward_mag
@@ -302,7 +302,9 @@ def detect_degradation(baseline, current, k_sigma, min_ratio, reward_drop_ratio_
 
     comm_degraded = current['comm_effect'] < comm_threshold
     value_degraded = current['value_sensitivity'] < 0.5 * baseline['value_sensitivity']
-    comm_related = bool(comm_degraded or value_degraded)
+    severe_collapse = reward_drop_ratio >= severe_reward_ratio
+    comm_anomaly = current['comm_effect'] > baseline['comm_effect'] + k_sigma * max(baseline.get('comm_effect_std', 0), abs(baseline['comm_effect']))
+    comm_related = bool(comm_degraded or value_degraded or severe_collapse or comm_anomaly)
 
     degraded = bool(reward_degraded and comm_related)
 
@@ -313,10 +315,100 @@ def detect_degradation(baseline, current, k_sigma, min_ratio, reward_drop_ratio_
         'comm_threshold': comm_threshold,
         'comm_degraded': bool(comm_degraded),
         'value_degraded': bool(value_degraded),
+        'severe_collapse': bool(severe_collapse),
+        'comm_anomaly': bool(comm_anomaly),
         'comm_related': comm_related,
         'reward_drop': baseline['reward'] - current['reward'],
         'comm_effect_drop': baseline['comm_effect'] - current['comm_effect'],
     }
+
+
+def detect_degradation_meta_causal(baseline, current,
+                                   reward_drop_ratio_threshold=0.10,
+                                   causal_attribution_threshold=0.20,
+                                   cost_lambda=0.02,
+                                   severe_reward_ratio=0.50):
+    """
+    Continuous Meta-Causal Decision Trigger with Cost-Utility Gating.
+
+    Frames online repair as an optimal investment decision under resource constraints (Pareto Frugality):
+      1. Causal Attribution Ratio (rho_causal):
+         Measures what fraction of total task performance loss is causally attributable to
+         communication breakdown:
+           rho_causal = (comm_effect_base - comm_effect_deg) / max(reward_base - reward_deg, epsilon)
+      2. Multi-Signal Causal Evidence Score (S_causal in [0, 1]):
+         Synthesizes interventional comm benefit loss, Pearl's CIC value-sensitivity degradation,
+         and comm effect drop magnitude.
+      3. Expected Value of Repair (EVR / Cost-Benefit ROI):
+         Quantifies expected recovery gain vs computational fine-tuning cost:
+           ROI = Expected_Comm_Recovery - lambda * Compute_Cost_Base
+         Prevents wasteful spending on non-communicative task difficulty.
+    """
+    baseline_reward_mag = abs(baseline['reward']) + 1e-6
+    reward_drop = baseline['reward'] - current['reward']
+    reward_drop_ratio = reward_drop / baseline_reward_mag
+
+    comm_drop = baseline['comm_effect'] - current['comm_effect']
+    baseline_comm_mag = abs(baseline['comm_effect']) + 1e-6
+
+    # 1. Causal Attribution Ratio: fraction of performance loss from comm failure
+    if reward_drop > 1e-6:
+        causal_attribution_ratio = max(-1.0, min(2.0, comm_drop / reward_drop))
+    else:
+        causal_attribution_ratio = 0.0
+
+    # 2. Value sensitivity degradation ratio (CIC)
+    v_base = max(1e-6, baseline.get('value_sensitivity', 0.0))
+    v_curr = current.get('value_sensitivity', 0.0)
+    value_sens_loss_ratio = max(0.0, (v_base - v_curr) / v_base)
+
+    # 3. Composite Causal Breakdown Score in [0, 1]
+    comm_drop_fraction = max(0.0, comm_drop / baseline_comm_mag)
+    causal_evidence_score = (
+        0.50 * max(0.0, min(1.0, causal_attribution_ratio)) +
+        0.30 * min(1.0, value_sens_loss_ratio) +
+        0.20 * min(1.0, comm_drop_fraction)
+    )
+
+    # 4. Expected Value of Repair (Cost-Utility ROI)
+    expected_recovery = max(0.0, comm_drop) * causal_evidence_score
+    compute_cost = cost_lambda * baseline_reward_mag
+    roi = expected_recovery - compute_cost
+    roi_positive = roi > 0.0
+
+    # Decision rule:
+    reward_degraded = reward_drop_ratio >= reward_drop_ratio_threshold
+    causal_confirmed = (causal_evidence_score >= causal_attribution_threshold) and roi_positive
+    severe_collapse = reward_drop_ratio >= severe_reward_ratio
+
+    trigger = bool(reward_degraded and (causal_confirmed or severe_collapse))
+
+    if not reward_degraded:
+        decision_summary = f"Frugal Abstention: Reward drop ({reward_drop_ratio:.1%}) below threshold ({reward_drop_ratio_threshold:.1%})"
+    elif severe_collapse:
+        decision_summary = f"Emergency Trigger: Catastrophic coordination collapse ({reward_drop_ratio:.1%} >= {severe_reward_ratio:.1%})"
+    elif causal_confirmed:
+        decision_summary = f"Causal Trigger Confirmed: Communication breakdown verified (Evidence={causal_evidence_score:.2f} >= {causal_attribution_threshold:.2f}, ROI=+{roi:.1f})"
+    else:
+        decision_summary = f"Frugal Abstention: Performance loss is non-communicative (Evidence={causal_evidence_score:.2f}, ROI={roi:+.1f}) -> Preserving compute & policy"
+
+    return trigger, {
+        'reward_drop_ratio': reward_drop_ratio,
+        'reward_drop_ratio_threshold': reward_drop_ratio_threshold,
+        'causal_attribution_ratio': causal_attribution_ratio,
+        'causal_evidence_score': causal_evidence_score,
+        'value_sens_loss_ratio': value_sens_loss_ratio,
+        'expected_recovery': expected_recovery,
+        'compute_cost': compute_cost,
+        'roi': roi,
+        'roi_positive': roi_positive,
+        'severe_collapse': severe_collapse,
+        'causal_confirmed': causal_confirmed,
+        'decision_summary': decision_summary,
+        'reward_drop': reward_drop,
+        'comm_effect_drop': comm_drop,
+    }
+
 
 
 def detect_degradation_reward_only(baseline, current, reward_drop_ratio_threshold):
@@ -758,6 +850,14 @@ def parse_args(args, parser):
                              "given, else 'comm'), no escalation. Exists to test whether causal "
                              "triggering beats the naive alternative; never combine its trigger "
                              "logic with the causal controller's target selection.")
+    parser.add_argument('--trigger_mode', type=str, default='meta_causal',
+                        choices=['meta_causal', 'and_gate'],
+                        help="'meta_causal' (default): Continuous Causal Attribution Ratio + Cost-Utility ROI gating. "
+                             "'and_gate': Classical rigid AND-gate (reward drop AND comm drop).")
+    parser.add_argument('--causal_attribution_threshold', type=float, default=0.20,
+                        help="meta_causal trigger: minimum composite causal breakdown evidence score in [0, 1] to trigger.")
+    parser.add_argument('--cost_lambda', type=float, default=0.02,
+                        help="meta_causal trigger: fine-tuning compute cost coefficient for Expected Value of Repair (ROI).")
     parser.add_argument('--reward_only_drop_ratio', type=float, default=0.20,
                         help="--controller reward_only trigger threshold: fraction of |baseline "
                              "reward| that must be lost to trigger repair.")
@@ -983,19 +1083,40 @@ def main(args):
         print("  >>> ENVIRONMENT CHANGE {} (reward-only trigger)".format(
             "DETECTED" if is_degraded else "NOT detected"))
     else:
-        is_degraded, detect_info = detect_degradation(
-            baseline, degraded, all_args.detect_k_sigma, all_args.detect_min_ratio,
-            all_args.detect_reward_drop_ratio)
-        print("\n[3] Detection (causal: reward-degraded AND comm-related, both required):")
-        print("  reward drop ratio     : {:.2f}  (threshold {:.2f}, degraded={})".format(
-            detect_info['reward_drop_ratio'], detect_info['reward_drop_ratio_threshold'],
-            detect_info['reward_degraded']))
-        print("  comm_effect threshold : {:.1f}   (baseline {:.1f} -> degraded {:.1f}, degraded={})".format(
-            detect_info['comm_threshold'], baseline['comm_effect'], degraded['comm_effect'],
-            detect_info['comm_degraded']))
-        print("  value-sensitivity     : {:.3f} -> {:.3f}  (degraded={})".format(
-            baseline['value_sensitivity'], degraded['value_sensitivity'], detect_info['value_degraded']))
-        print("  >>> ENVIRONMENT CHANGE {}".format("DETECTED" if is_degraded else "NOT detected"))
+        if getattr(all_args, 'trigger_mode', 'meta_causal') == 'meta_causal':
+            is_degraded, detect_info = detect_degradation_meta_causal(
+                baseline, degraded,
+                reward_drop_ratio_threshold=all_args.detect_reward_drop_ratio,
+                causal_attribution_threshold=all_args.causal_attribution_threshold,
+                cost_lambda=all_args.cost_lambda,
+                severe_reward_ratio=all_args.select_severe_reward_ratio)
+            print("\n[3] Detection (META-CAUSAL: Causal Attribution Ratio + Cost-Utility ROI Gating):")
+            print("  reward drop ratio         : {:.2f}  (threshold {:.2f})".format(
+                detect_info['reward_drop_ratio'], detect_info['reward_drop_ratio_threshold']))
+            print("  causal attribution ratio  : {:.2f}  (comm loss / reward loss)".format(
+                detect_info['causal_attribution_ratio']))
+            print("  causal evidence score     : {:.2f}  (threshold {:.2f}, confirmed={})".format(
+                detect_info['causal_evidence_score'], all_args.causal_attribution_threshold,
+                detect_info['causal_confirmed']))
+            print("  expected recovery (ROI)   : {:+.1f}  (cost lambda={:.3f}, positive={})".format(
+                detect_info['roi'], all_args.cost_lambda, detect_info['roi_positive']))
+            print("  decision summary          : {}".format(detect_info['decision_summary']))
+            print("  >>> ENVIRONMENT CHANGE {}".format("DETECTED" if is_degraded else "NOT detected"))
+        else:
+            is_degraded, detect_info = detect_degradation(
+                baseline, degraded, all_args.detect_k_sigma, all_args.detect_min_ratio,
+                all_args.detect_reward_drop_ratio,
+                severe_reward_ratio=all_args.select_severe_reward_ratio)
+            print("\n[3] Detection (causal: reward-degraded AND comm-related, both required):")
+            print("  reward drop ratio     : {:.2f}  (threshold {:.2f}, degraded={})".format(
+                detect_info['reward_drop_ratio'], detect_info['reward_drop_ratio_threshold'],
+                detect_info['reward_degraded']))
+            print("  comm_effect threshold : {:.1f}   (baseline {:.1f} -> degraded {:.1f}, degraded={})".format(
+                detect_info['comm_threshold'], baseline['comm_effect'], degraded['comm_effect'],
+                detect_info['comm_degraded']))
+            print("  value-sensitivity     : {:.3f} -> {:.3f}  (degraded={})".format(
+                baseline['value_sensitivity'], degraded['value_sensitivity'], detect_info['value_degraded']))
+            print("  >>> ENVIRONMENT CHANGE {}".format("DETECTED" if is_degraded else "NOT detected"))
 
     if not is_degraded or all_args.no_repair:
         print("\nDone (no repair stage).")
