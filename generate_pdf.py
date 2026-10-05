@@ -3,9 +3,10 @@ import re
 import subprocess
 import markdown
 
-md_path = r"d:\capstone\capstone_project\MAC_COPY\COMPLETE_APPLICATION_RUN_DOWN.md"
-html_path = r"d:\capstone\capstone_project\MAC_COPY\COMPLETE_APPLICATION_RUN_DOWN.html"
-pdf_path = r"d:\capstone\capstone_project\MAC_COPY\COMPLETE_APPLICATION_RUN_DOWN.pdf"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+md_path = os.path.join(BASE_DIR, "docs", "COMPLETE_APPLICATION_RUN_DOWN.md")
+html_path = os.path.join(BASE_DIR, "docs", "COMPLETE_APPLICATION_RUN_DOWN.html")
+pdf_path = os.path.join(BASE_DIR, "docs", "COMPLETE_APPLICATION_RUN_DOWN.pdf")
 
 with open(md_path, "r", encoding="utf-8") as f:
     md_text = f.read()
