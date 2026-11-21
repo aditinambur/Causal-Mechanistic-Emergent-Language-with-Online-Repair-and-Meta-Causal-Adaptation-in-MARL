@@ -1166,6 +1166,27 @@ def main(args):
                             all_args.num_agents = len(agent_cols)
                             break
 
+            # Most reliable source: the checkpoint itself. The centralized critic's first layer
+            # takes concat(N * obs_dim, message_dim), so N = (in_features - msg_dim) / obs_dim.
+            # (The CSV fallback above is absent for short runs, and the old default of 2 then
+            # silently mis-derived num_landmarks -- the failure mode behind data issue D2.)
+            critic_path = os.path.join(os.path.dirname(actor_path), "critic.pt")
+            if "message_head.weight" in sd and "token_embedding.weight" in sd and os.path.exists(critic_path):
+                csd = torch.load(critic_path, map_location="cpu")
+                w = csd.get("base.mlp.fc1.0.weight")
+                obs_dim_ = sd["message_head.weight"].shape[1]
+                msg_dim_ = sd["token_embedding.weight"].shape[1]
+                if w is not None:
+                    for extra in (msg_dim_, 0):
+                        n_float = (w.shape[1] - extra) / obs_dim_
+                        if n_float >= 1 and float(n_float).is_integer():
+                            n_ckpt = int(n_float)
+                            if n_ckpt != all_args.num_agents:
+                                print("[REPAIR] num_agents from checkpoint critic = {} (was {})".format(
+                                    n_ckpt, all_args.num_agents))
+                            all_args.num_agents = n_ckpt
+                            break
+
             if "message_head.weight" in sd:
                 obs_dim = sd["message_head.weight"].shape[1]
                 calc_landmarks = (obs_dim - 4 - 4 * (all_args.num_agents - 1)) // 2
