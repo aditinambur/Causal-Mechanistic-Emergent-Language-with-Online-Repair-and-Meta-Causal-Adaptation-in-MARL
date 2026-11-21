@@ -94,8 +94,7 @@ class R_MAPPOPolicy:
             )
 
         prev_obs_per_agent = prev_share_obs.view(batch_size, self.num_agents, self.actor.obs_dim)
-        token_logits = self.actor.message_head(prev_obs_per_agent)
-        token_probs = torch.softmax(token_logits, dim=-1)
+        token_probs = self.actor.emit_token_probs(prev_obs_per_agent)  # shift hooks applied
         all_messages = torch.matmul(token_probs, self.actor.token_embedding.weight)
         recv_idx = torch.arange(batch_size, device=all_messages.device) % self.num_agents
         recv_attention = self.attention_weight.to(device=all_messages.device, dtype=all_messages.dtype)[recv_idx]

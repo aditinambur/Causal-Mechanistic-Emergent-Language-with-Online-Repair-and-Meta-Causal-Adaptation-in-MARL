@@ -338,13 +338,27 @@ class MPERunner(Runner):
             
             # CAUSAL INTERVENTION: applied to the incoming aggregated message BEFORE the policy.
             messages_for_policy = eval_policy_messages.copy()
-            if intervention_type == 'no_messages':
+            if intervention_type == 'record':
+                # Rebuttal E11: a normal rollout that also stores the incoming sender messages,
+                # used as the reference distribution for mean / resampled ablations.
+                self._recorded_messages.append(messages_for_policy.copy())
+            elif intervention_type == 'no_messages':
                 messages_for_policy = np.zeros_like(messages_for_policy)
+            elif intervention_type in ('mean_messages', 'resampled_messages'):
+                # Rebuttal E11: on-distribution ablations. Step 0 is zero in every condition
+                # (no message has been sent yet), so it is left untouched.
+                if eval_step > 0:
+                    if intervention_type == 'mean_messages':
+                        messages_for_policy = np.broadcast_to(
+                            self._ablation_mean_message, messages_for_policy.shape).astype(np.float32).copy()
+                    else:
+                        bank = self._ablation_message_bank
+                        messages_for_policy = bank[min(eval_step, len(bank) - 1)].copy()
             elif intervention_type == 'noisy':
                 if self.all_args.eval_noise_std > 0:
                     noise = np.random.normal(0, self.all_args.eval_noise_std, size=messages_for_policy.shape)
                     messages_for_policy = messages_for_policy + noise
-            elif intervention_type != 'normal':
+            elif intervention_type not in ('normal', 'record', 'mean_messages', 'resampled_messages'):
                 raise ValueError("Unknown intervention_type: {}".format(intervention_type))
 
             # Build the centralized critic obs exactly as during training (centralized-V):

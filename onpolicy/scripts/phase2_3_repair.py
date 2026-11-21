@@ -53,6 +53,7 @@ from onpolicy.envs.mirror_wrapper import (
     PartnerRotationObsVecEnv,
     compute_mirror_indices,
 )
+from onpolicy.envs.perturbations import build_shift, describe_shift
 from onpolicy.runner.shared.mpe_runner import MPERunner
 
 
@@ -82,6 +83,9 @@ def _wrap_perturbed_env(venv, all_args, mirror_idx):
         angle_deg=all_args.perturb_angle,
     )
 
+_LAST_RUNNER = []  # lets _log_and_close record rollback hash checks without a signature change
+
+
 class RepairRunner(MPERunner):
     """MPERunner extended with Phase 2 measurement/detection and Phase 3 online repair."""
 
@@ -106,7 +110,22 @@ class RepairRunner(MPERunner):
 
     # -- Phase 2: measurement -------------------------------------------------
     @torch.no_grad()
+    # -- rebuttal: shift hooks follow the active env (onpolicy/envs/perturbations.py) --
+    def _install_shift_hooks(self, env):
+        hooks = getattr(env, 'actor_hooks', None) if 'actor_hooks' in getattr(env, '__dict__', {}) else None
+        self.trainer.policy.actor.set_shift_hooks(hooks or {})
+
+    def _clear_shift_hooks(self):
+        self.trainer.policy.actor.set_shift_hooks({})
+
     def measure_comm_metrics(self, n_episodes, base_seed):
+        self._install_shift_hooks(self.eval_envs)
+        try:
+            return self._measure_comm_metrics_impl(n_episodes, base_seed)
+        finally:
+            self._clear_shift_hooks()
+
+    def _measure_comm_metrics_impl(self, n_episodes, base_seed):
         """
         Measure the communication fingerprint on the CURRENT self.eval_envs:
           - reward            : mean return under the real (non-intervened) policy
@@ -137,13 +156,48 @@ class RepairRunner(MPERunner):
         normal = np.array(normal)
         no_msg = np.array(no_msg)
         eff = normal - no_msg
+        extra = {}
+        if getattr(self.all_args, 'extra_ablations', False):
+            extra = self._on_distribution_ablations(n_episodes, base_seed, normal)
         return {
+            **extra,
             'reward': float(normal.mean()),
             'no_msg_reward': float(no_msg.mean()),
             'comm_effect': float(eff.mean()),
             'comm_effect_std': float(eff.std()),
             'value_sensitivity': float(np.mean(value_sens)),
             'kl': float(np.mean(kl_vals)),
+        }
+
+    def _on_distribution_ablations(self, n_episodes, base_seed, normal):
+        """Rebuttal E11. Zeroing the incoming message feeds the actor an input it never saw in
+        training, so c = G_msg - G_zero can mix "information lost" with "input went off-
+        distribution". Two on-distribution counterfactuals under the SAME condition (same env,
+        same shift hooks), still CRN-paired on the evaluated layout:
+          mean      : every incoming message replaced by the mean message of reference rollouts
+          resampled : at step t, the messages recorded at step t of a reference rollout started
+                      from a DIFFERENT layout (content decoupled from the current situation)
+        Reference rollouts use seeds disjoint from the evaluated ones."""
+        ref_seed = base_seed + 7_000_003
+        banks = []
+        for k in range(n_episodes):
+            self._recorded_messages = []
+            self._eval_with_intervention('record', crn_seed=ref_seed + k)
+            banks.append(self._recorded_messages)
+        allmsg = np.concatenate([np.stack(b[1:]) for b in banks], axis=0)  # skip step 0 (zeros)
+        self._ablation_mean_message = allmsg.reshape(-1, allmsg.shape[-1]).mean(axis=0)
+        mean_r, res_r = [], []
+        for k in range(n_episodes):
+            crn_seed = base_seed + k
+            mean_r.append(float(np.sum(self._eval_with_intervention('mean_messages', crn_seed=crn_seed))))
+            self._ablation_message_bank = banks[k]
+            res_r.append(float(np.sum(self._eval_with_intervention('resampled_messages', crn_seed=crn_seed))))
+        mean_r, res_r = np.array(mean_r), np.array(res_r)
+        return {
+            'mean_msg_reward': float(mean_r.mean()),
+            'comm_effect_mean_ablation': float((normal - mean_r).mean()),
+            'resampled_msg_reward': float(res_r.mean()),
+            'comm_effect_resample_ablation': float((normal - res_r).mean()),
         }
 
     # -- Phase 3: online repair ----------------------------------------------
@@ -173,6 +227,15 @@ class RepairRunner(MPERunner):
         elif target == 'lora':
             from onpolicy.algorithms.utils.lora import set_actor_lora_trainable
             set_actor_lora_trainable(actor, trainable_comm=True)
+        elif target == 'actor_lora':
+            # Rebuttal E1 (R1's requested control): the SAME LoRA adapters on the actor trunk
+            # and action head, but the communication pathway (message_head, token_embedding,
+            # attention_weight) is FROZEN. Isolates "remap the shifted observation" from
+            # "repair communication".
+            from onpolicy.algorithms.utils.lora import set_actor_lora_trainable, LoRALinear
+            if not any(isinstance(m, LoRALinear) and m.r > 0 for m in actor.modules()):
+                raise ValueError("--repair_target actor_lora needs --lora_rank > 0")
+            set_actor_lora_trainable(actor, trainable_comm=False)
         else:
             for m in actor.modules():
                 if hasattr(m, 'lora_A') and m.lora_A is not None:
@@ -226,6 +289,7 @@ class RepairRunner(MPERunner):
         attn = getattr(self.trainer.policy, "attention_weight", None)
         value_normalizer = getattr(self.trainer, "value_normalizer", None)
         return {
+            'hash': self._policy_state_hash(),
             'actor': copy.deepcopy(self.trainer.policy.actor.state_dict()),
             'critic': copy.deepcopy(self.trainer.policy.critic.state_dict()),
             'attention_weight': attn.detach().clone() if attn is not None else None,
@@ -235,8 +299,39 @@ class RepairRunner(MPERunner):
                                  if value_normalizer is not None else None),
         }
 
+    def _policy_state_hash(self):
+        """SHA-256 over every tensor that defines behaviour or future updates: actor, critic,
+        attention_weight and the value normalizer (rebuttal E5: lets us claim bit-exact rollback
+        only when it is verified)."""
+        import hashlib
+        h = hashlib.sha256()
+        parts = [('actor', self.trainer.policy.actor.state_dict()),
+                 ('critic', self.trainer.policy.critic.state_dict())]
+        vn = getattr(self.trainer, "value_normalizer", None)
+        if vn is not None:
+            parts.append(('vn', vn.state_dict()))
+        for tag, sd in parts:
+            for k in sorted(sd.keys()):
+                v = sd[k]
+                if torch.is_tensor(v):
+                    h.update((tag + k).encode())
+                    h.update(v.detach().cpu().contiguous().numpy().tobytes())
+        attn = getattr(self.trainer.policy, "attention_weight", None)
+        if attn is not None:
+            h.update(attn.detach().cpu().contiguous().numpy().tobytes())
+        return h.hexdigest()
+
     def _restore_repairable_state(self, snapshot):
-        """Restore exactly the parameters + optimizer state captured by _snapshot_repairable_state."""
+        """Restore exactly the parameters + optimizer state captured by _snapshot_repairable_state,
+        then verify the restored state hashes identically to the snapshot."""
+        self._restore_impl(snapshot)
+        if snapshot.get('hash') is not None:
+            ok = self._policy_state_hash() == snapshot['hash']
+            self.rollback_checks = getattr(self, 'rollback_checks', []) + [bool(ok)]
+            print("  [ROLLBACK CHECK] restored state {} the snapshot (sha256)".format(
+                "is BIT-EXACT with" if ok else "DIFFERS from"))
+
+    def _restore_impl(self, snapshot):
         self.trainer.policy.actor.load_state_dict(snapshot['actor'])
         self.trainer.policy.critic.load_state_dict(snapshot['critic'])
         attn = getattr(self.trainer.policy, "attention_weight", None)
@@ -250,6 +345,13 @@ class RepairRunner(MPERunner):
             value_normalizer.load_state_dict(snapshot['value_normalizer'])
 
     def repair(self, repair_iters, target='comm'):
+        self._install_shift_hooks(self.envs)
+        try:
+            return self._repair_impl(repair_iters, target)
+        finally:
+            self._clear_shift_hooks()
+
+    def _repair_impl(self, repair_iters, target='comm'):
         """
         Online repair on the CHANGED environment (self.envs must already be mirrored).
         Runs `repair_iters` PPO update iterations. Messages are kept ON during the repair
@@ -697,6 +799,12 @@ def _log_and_close(all_args, run_dir, baseline, degraded, detect_info, repaired,
         'scenario_name': all_args.scenario_name,
         'mirror_scope': all_args.mirror_scope,
         'perturb_angle': all_args.perturb_angle,
+        'run_label': all_args.run_label,
+        'shift': describe_shift(all_args),
+        'rollback_checks': getattr(_LAST_RUNNER[0], 'rollback_checks', None) if _LAST_RUNNER else None,
+        'shift_kind': all_args.shift,
+        'decouple': all_args.decouple,
+        'lora_rank': getattr(all_args, 'lora_rank', None),
         'controller': all_args.controller,
         'repair_strategy': all_args.repair_strategy,
         'repair_target_arg': all_args.repair_target,
@@ -847,6 +955,9 @@ def _print_fingerprint(label, fp):
           "value_sens={:.3f}  kl={:.3f}".format(
               label, fp['reward'], fp['no_msg_reward'], fp['comm_effect'],
               fp['comm_effect_std'], fp['value_sensitivity'], fp['kl']))
+    if 'comm_effect_mean_ablation' in fp:
+        print("  [{}] (E11) c_zero={:.1f}  c_mean={:.1f}  c_resample={:.1f}".format(
+            label, fp['comm_effect'], fp['comm_effect_mean_ablation'], fp['comm_effect_resample_ablation']))
 
 
 def parse_args(args, parser):
@@ -862,6 +973,34 @@ def parse_args(args, parser):
                         help=("Optional Task-8 partner-position rotation in degrees. "
                               "0 = no perturbation, 180 = partner_full-equivalent. "
                               "If omitted, the existing --mirror_scope behaviour is used."),)
+    # ---- rebuttal shift suite (onpolicy/envs/perturbations.py) ----
+    parser.add_argument('--shift', type=str, default='obs', choices=['obs', 'comm_perm', 'dynamics'],
+                        help="'obs': partner-perception shift (paper default, uses --mirror_scope). "
+                             "'comm_perm': communication-only shift, sender token weights permuted "
+                             "by a fixed derangement, observations untouched (E2). 'dynamics': "
+                             "non-communication shift, agent acceleration/damping changed, "
+                             "observations and messages untouched (E2).")
+    parser.add_argument('--decouple', type=str, default='none', choices=['none', 'msg_only', 'actor_only'],
+                        help="with --shift obs: 'msg_only' = only the message head sees the shifted "
+                             "observation (trunk gets the clean one); 'actor_only' = only the actor "
+                             "trunk sees it (messages computed from the clean one). E2b.")
+    parser.add_argument('--run_label', type=str, default=None,
+                        help="free-text label stored in the results row (set by rebuttal_experiments.py).")
+    parser.add_argument('--always_evaluate', action='store_true', default=False,
+                        help="manual mode: also measure clean retention and held-out recovery for "
+                             "REJECTED repairs (before rollback), for matched arm comparisons.")
+    parser.add_argument('--force_repair', action='store_true', default=False,
+                        help="run the repair stage even when the trigger abstains (forced-repair "
+                             "controls E1/E2b); the trigger's own decision is still logged.")
+    parser.add_argument('--extra_ablations', action='store_true', default=False,
+                        help="also measure c under mean-message and resampled-message ablation "
+                             "(on-distribution counterfactuals, E11). Zero ablation stays primary.")
+    parser.add_argument('--comm_perm_seed', type=int, default=0,
+                        help="seed of the fixed token derangement for --shift comm_perm.")
+    parser.add_argument('--dyn_accel_scale', type=float, default=0.5,
+                        help="--shift dynamics: multiply effective agent acceleration by this.")
+    parser.add_argument('--dyn_damping', type=float, default=None,
+                        help="--shift dynamics: override world damping (default 0.25 unchanged).")
     parser.add_argument('--measure_episodes', type=int, default=8,
                         help="CRN-paired episodes per condition when measuring a fingerprint.")
     parser.add_argument('--repair_iters', type=int, default=15,
@@ -871,7 +1010,7 @@ def parse_args(args, parser):
     parser.add_argument('--lora_alpha', type=float, default=8.0,
                         help="scaling factor alpha for LoRA adapters.")
     parser.add_argument('--repair_target', type=str, default=None,
-                        choices=['embedding', 'comm', 'lora', 'full', 'noncomm'],
+                        choices=['embedding', 'comm', 'lora', 'actor_lora', 'full', 'noncomm'],
                         help="Default None: the causal controller (select_repair_target) picks "
                              "the target automatically from the fingerprint, with escalation on "
                              "rejection. Pass explicitly to BYPASS the controller and escalation "
@@ -1078,6 +1217,15 @@ def main(args):
     # Envs: a train env (for repair rollouts) and an eval env (for measurement).
     envs = _make_mpe_vec_env(all_args, all_args.n_rollout_threads, all_args.seed)
     eval_envs = _make_mpe_vec_env(all_args, all_args.n_eval_rollout_threads, all_args.seed * 50000)
+    # Rebuttal E2: the non-communication 'dynamics' shift needs envs built with altered physics.
+    # Same seeds as the clean envs, so CRN layouts match across clean and shifted conditions.
+    shifted_envs = shifted_eval_envs = None
+    if all_args.shift == 'dynamics':
+        import copy
+        dyn_args = copy.copy(all_args)
+        dyn_args.dyn_active = True
+        shifted_envs = _make_mpe_vec_env(dyn_args, all_args.n_rollout_threads, all_args.seed)
+        shifted_eval_envs = _make_mpe_vec_env(dyn_args, all_args.n_eval_rollout_threads, all_args.seed * 50000)
 
     # Default run_dir: a sibling folder next to --model_dir, never inside it (avoids
     # littering the checkpoint directory -- see the run_dir gotcha documented in
@@ -1112,6 +1260,7 @@ def main(args):
     all_args.use_wandb = False
 
     runner = RepairRunner(config)  # restores from model_dir inside __init__
+    _LAST_RUNNER[:] = [runner]
 
     mirror_idx = compute_mirror_indices(
         all_args.num_agents, all_args.num_landmarks, scope=all_args.mirror_scope)
@@ -1123,6 +1272,7 @@ def main(args):
     print("mirror scope    :", all_args.mirror_scope, "-> indices", mirror_idx)
     if all_args.perturb_angle is not None:
         print("Task-8 partner rotation :",all_args.perturb_angle,"degrees",)
+    print("shift           :", describe_shift(all_args))
     print("controller      :", all_args.controller)
     print("repair strategy :", all_args.repair_strategy)
     print("repair target   :", all_args.repair_target if all_args.repair_target is not None
@@ -1154,11 +1304,7 @@ def main(args):
     _print_fingerprint("BASELINE", baseline)
 
     # 2) Apply the environment change (one-sided mirror) and measure degradation.
-    runner.eval_envs = _wrap_perturbed_env(
-    eval_envs,
-    all_args,
-    mirror_idx,
-    )   
+    runner.eval_envs = build_shift(eval_envs, all_args, shifted_eval_envs)
     print("\n[2] Degraded fingerprint (mirrored environment):")
     degraded = runner.measure_comm_metrics(all_args.measure_episodes, base_seed)
     _print_fingerprint("DEGRADED", degraded)
@@ -1209,6 +1355,14 @@ def main(args):
                 baseline['value_sensitivity'], degraded['value_sensitivity'], detect_info['value_degraded']))
             print("  >>> ENVIRONMENT CHANGE {}".format("DETECTED" if is_degraded else "NOT detected"))
 
+    # Rebuttal E1/E2b: forced repairs on every seed, independent of the trigger. The trigger's
+    # real decision is still recorded in detect_info['trigger_decision'] for E6.
+    detect_info['trigger_decision'] = bool(is_degraded)
+    if all_args.force_repair and not is_degraded and not all_args.no_repair:
+        print("  >>> --force_repair: trigger said NO; repairing anyway (decision logged)")
+        is_degraded = True
+        detect_info['forced'] = True
+
     if not is_degraded or all_args.no_repair:
         print("\nDone (no repair stage).")
         final_status = {'mode': 'no_repair_control' if all_args.no_repair else 'not_degraded'}
@@ -1216,11 +1370,7 @@ def main(args):
         return
 
     # 4) Online repair on the mirrored environment.
-    runner.envs = _wrap_perturbed_env(
-    envs,
-    all_args,
-    mirror_idx,
-    )
+    runner.envs = build_shift(envs, all_args, shifted_envs)
 
     if all_args.repair_target is not None:
         # PRIORITY 8 / manual override: exactly one fixed-target attempt, no controller,
@@ -1236,6 +1386,15 @@ def main(args):
             all_args.accept_reward_recovery, all_args.accept_comm_recovery)
         _print_acceptance(acc_info, accepted)
         saved_path = None
+        rejected_diagnostics = None
+        if not accepted and all_args.always_evaluate:
+            # Rebuttal E1/E2b: measure clean retention + held-out recovery for REJECTED repairs
+            # too (before rolling back), so every arm is compared on the same metrics.
+            print("\n[4b] --always_evaluate: diagnostics for the rejected repair before rollback")
+            rejected_diagnostics = _measure_normal_env_retention(runner, eval_envs, baseline, all_args, base_seed)
+            if all_args.holdout_episodes != 0:
+                rejected_diagnostics.update(
+                    _holdout_validate_repair(runner, eval_envs, snapshot, all_args, base_seed))
         if not accepted:
             print("  [ROLLBACK] restoring pre-repair parameters (manual mode: no escalation)")
             runner._restore_repairable_state(snapshot)
@@ -1245,7 +1404,8 @@ def main(args):
         print("  repair {}: {}".format("accepted" if accepted else "REJECTED (rolled back)",
                                         all_args.repair_target))
         final_status = {'mode': 'manual', 'target': all_args.repair_target,
-                        'accepted': accepted, 'saved_path': saved_path, **acc_info}
+                        'accepted': accepted, 'saved_path': saved_path,
+                        'rejected_diagnostics': rejected_diagnostics, **acc_info}
 
     elif all_args.controller == 'reward_only':
         # PRIORITY 7: fixed target, single attempt, no escalation -- isolates the TRIGGER

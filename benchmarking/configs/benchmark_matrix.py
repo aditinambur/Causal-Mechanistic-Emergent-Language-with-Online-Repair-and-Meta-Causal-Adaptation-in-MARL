@@ -65,6 +65,18 @@ CONTROL_ARMS: Dict[str, Dict[str, Any]] = {
         "repair_target": "noncomm",
         "description": "Ablation: Freezes all communication parameters; adapts only the motor action output layer.",
     },
+    "actor_only_lora": {
+        "name": "Actor-Only LoRA (Comm Frozen)",
+        "controller": "causal",
+        "repair_target": "actor_lora",
+        "description": "Rebuttal E1 (R1): same rank-4 LoRA on actor trunk + action head, communication pathway (message_head, token_embedding, attention) frozen.",
+    },
+    "comm_only": {
+        "name": "Comm-Pathway Only",
+        "controller": "causal",
+        "repair_target": "comm",
+        "description": "Rebuttal E1: only message_head + token_embedding + attention trainable; actor trunk and action head frozen.",
+    },
     "no_repair": {
         "name": "No-Repair Baseline",
         "controller": "causal",

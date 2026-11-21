@@ -46,6 +46,13 @@ class R_Actor(nn.Module):
 
         self.num_agents = args.num_agents
 
+        # Rebuttal shift hooks (see onpolicy/envs/perturbations.py). Empty dict = original
+        # behaviour. Installed/cleared by the repair runner according to the active env:
+        #   'trunk_pairs': (pairs, M) transform applied to obs before the actor trunk only
+        #   'msg_pairs'  : (pairs, M) transform applied to obs before the message head only
+        #   'token_perm' : permutation of the V token weights applied at send time
+        self.shift_hooks = {}
+
         if self._supports_message_concat:
             # Build encoder for [obs, message] concatenated input.
             fused_obs_shape = (self.obs_dim + self.message_dim,)
@@ -67,6 +74,38 @@ class R_Actor(nn.Module):
     def disable_lora(self):
         from onpolicy.algorithms.utils.lora import eject_lora_from_actor
         eject_lora_from_actor(self)
+
+    # -- rebuttal shift hooks -------------------------------------------------------------
+    def set_shift_hooks(self, hooks):
+        self.shift_hooks = dict(hooks or {})
+
+    @staticmethod
+    def _apply_pairs(x, spec):
+        if spec is None:
+            return x
+        pairs, M = spec
+        if not pairs:
+            return x
+        ix = [int(p[0]) for p in pairs]
+        iy = [int(p[1]) for p in pairs]
+        xs, ys = x[..., ix], x[..., iy]
+        out = x.clone()
+        out[..., ix] = float(M[0][0]) * xs + float(M[0][1]) * ys
+        out[..., iy] = float(M[1][0]) * xs + float(M[1][1]) * ys
+        return out
+
+    def trunk_obs(self, obs):
+        """Observation as seen by the actor trunk (MLP base)."""
+        return self._apply_pairs(obs, self.shift_hooks.get('trunk_pairs'))
+
+    def emit_token_probs(self, obs):
+        """Sender-side token distribution (Eq. 1 weights), with any shift hooks applied."""
+        logits = self.message_head(self._apply_pairs(obs, self.shift_hooks.get('msg_pairs')))
+        probs = torch.softmax(logits, dim=-1)
+        perm = self.shift_hooks.get('token_perm')
+        if perm is not None:
+            probs = probs[..., list(perm)]
+        return probs
 
     def forward(self, obs, rnn_states, masks, available_actions=None, deterministic=False, messages=None):
         """
@@ -99,7 +138,7 @@ class R_Actor(nn.Module):
                 messages = check(messages).to(**self.tpdv)
                 messages = torch.nan_to_num(messages, nan=0.0, posinf=1.0, neginf=-1.0)
 
-            actor_input = torch.cat([obs, messages], dim=-1)
+            actor_input = torch.cat([self.trunk_obs(obs), messages], dim=-1)
             actor_features = self.base(actor_input)
         else:
             # Fallback path for non-MLP encoders.
@@ -109,8 +148,7 @@ class R_Actor(nn.Module):
         if self.message_head is not None:
             # Emit discrete token-based messages from local observations only:
             # message = softmax(message_head(obs)) @ token_embedding.weight
-            token_logits = self.message_head(obs)  # [batch, vocab_size]
-            token_probs = torch.softmax(token_logits, dim=-1)  # [batch, vocab_size]
+            token_probs = self.emit_token_probs(obs)  # [batch, vocab_size]
             output_messages = torch.matmul(token_probs, self.token_embedding.weight)  # [batch, message_dim]
         else:
             output_messages = torch.tanh(actor_features)
@@ -150,7 +188,7 @@ class R_Actor(nn.Module):
                 messages = check(messages).to(**self.tpdv)
                 messages = torch.nan_to_num(messages, nan=0.0, posinf=1.0, neginf=-1.0)
 
-            actor_input = torch.cat([obs, messages], dim=-1)
+            actor_input = torch.cat([self.trunk_obs(obs), messages], dim=-1)
             actor_features = self.base(actor_input)
         else:
             actor_features = self.base(obs)
@@ -205,8 +243,7 @@ class R_Actor(nn.Module):
                 if self.num_agents > 1:
                     prev_obs_per_agent = prev_share_obs.view(batch_size, self.num_agents, self.obs_dim)
 
-                    token_logits = self.message_head(prev_obs_per_agent)  # [batch, num_agents, vocab_size]
-                    token_probs = torch.softmax(token_logits, dim=-1)
+                    token_probs = self.emit_token_probs(prev_obs_per_agent)  # [batch, num_agents, vocab_size]
                     all_messages = torch.matmul(token_probs, self.token_embedding.weight)  # [batch, num_agents, message_dim]
 
                     # Aggregate excluding self-messages
@@ -222,7 +259,7 @@ class R_Actor(nn.Module):
                 messages = check(messages).to(**self.tpdv)
                 messages = torch.nan_to_num(messages, nan=0.0, posinf=1.0, neginf=-1.0)
 
-            actor_input = torch.cat([obs, messages], dim=-1)
+            actor_input = torch.cat([self.trunk_obs(obs), messages], dim=-1)
             actor_features = self.base(actor_input)
         else:
             # Fallback path for non-MLP encoders.

@@ -23,6 +23,19 @@ class Scenario(BaseScenario):
             agent.collide = True
             agent.silent = True
             agent.size = 0.15
+        # Rebuttal non-communication shift (E2, perturbations.py 'dynamics'): only active on
+        # the separately built shifted env (args.dyn_active=True); clean envs are untouched.
+        if getattr(args, 'dyn_active', False):
+            s = float(getattr(args, 'dyn_accel_scale', 1.0))
+            if s != 1.0:
+                # Effective force = mass * accel * sensitivity * u, and both factors equal
+                # agent.accel once it is set (default sensitivity 5.0, accel None). To scale
+                # the effective acceleration by s, set accel = sqrt(5 * s).
+                for agent in world.agents:
+                    agent.accel = float(np.sqrt(5.0 * s))
+            damping = getattr(args, 'dyn_damping', None)
+            if damping is not None:
+                world.damping = float(damping)
         # add landmarks
         world.landmarks = [Landmark() for i in range(world.num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
