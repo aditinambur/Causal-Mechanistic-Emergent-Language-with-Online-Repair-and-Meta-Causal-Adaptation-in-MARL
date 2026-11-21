@@ -18,9 +18,11 @@ the degradation, and automatically selects, applies and accepts-or-rejects an on
 
 | doc | what it is |
 |---|---|
-| **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** | the authoritative design doc — what is implemented, how to run it, and all validated results (§5.9–§5.12) |
-| **[TEAM_HANDOFF.md](TEAM_HANDOFF.md)** | what is done, what is still needed, in priority order — **start here if you are picking up the experiments** |
-| **[REFRAME.md](REFRAME.md)** | how the original three-layer plan maps onto what was actually built |
+| **[META_CAUSAL_ADAPTATION.md](docs/META_CAUSAL_ADAPTATION.md)** | **Plain-English Guide:** Why it's meta and causal, frugality, and empirical benchmark results |
+| **[PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)** | the authoritative design doc — what is implemented, how to run it, and all validated results (§5.9–§5.12) |
+| **[TEAM_HANDOFF.md](docs/TEAM_HANDOFF.md)** | what is done, what is still needed, in priority order — **start here if you are picking up the experiments** |
+| **[REFRAME.md](docs/REFRAME.md)** | how the original three-layer plan maps onto what was actually built |
+| **[docs/ Index](docs/README.md)** | Complete directory index of all documentation, reports, and PDFs |
 
 ### Quick start
 

@@ -312,6 +312,22 @@ def run_repair(run_id: str, config: RepairConfig, background_tasks: BackgroundTa
         
     repair_log_path = os.path.join(run["path"], "repair_output.log")
     
+    run_cfg = run.get("config", {})
+    num_agents = run_cfg.get("num_agents")
+    num_landmarks = run_cfg.get("num_landmarks")
+
+    if num_agents is None:
+        csv_path = os.path.join(run["path"], "causal_influence.csv")
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, "r") as f:
+                    header = f.readline().strip().split(",")
+                    agent_cols = [c for c in header if c.startswith("causal_influence_kl_agent")]
+                    if agent_cols:
+                        num_agents = len(agent_cols)
+            except Exception:
+                pass
+
     cmd = [
         sys.executable, "-u", "onpolicy/scripts/phase2_3_repair.py",
         "--env_name", "MPE",
@@ -326,6 +342,11 @@ def run_repair(run_id: str, config: RepairConfig, background_tasks: BackgroundTa
         "--n_eval_rollout_threads", "1"
     ]
     
+    if num_agents is not None:
+        cmd.extend(["--num_agents", str(num_agents)])
+    if num_landmarks is not None:
+        cmd.extend(["--num_landmarks", str(num_landmarks)])
+
     if config.controller != "causal":
         cmd.extend(["--controller", config.controller])
     if config.repair_target != "auto":
