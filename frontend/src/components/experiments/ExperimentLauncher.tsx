@@ -157,6 +157,9 @@ export const ExperimentLauncher: React.FC<ExperimentLauncherProps> = ({
                 required
                 className="form-input"
               />
+              <span className="field-hint">
+                Controls layout &amp; weight init; pairs rollouts via Common Random Numbers (CRN)
+              </span>
             </div>
             <div className="form-group flex-1">
               <label>Episode Max Length</label>
@@ -167,6 +170,9 @@ export const ExperimentLauncher: React.FC<ExperimentLauncherProps> = ({
                 required
                 className="form-input"
               />
+              <span className="field-hint">
+                Max timesteps per rollout episode (default: 25 steps) to cover landmarks
+              </span>
             </div>
           </div>
         </div>

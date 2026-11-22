@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw, Image, AlertCircle } from 'lucide-react';
+import { RefreshCw, Image, AlertCircle, Info } from 'lucide-react';
 import { getRunGifUrl, triggerRenderGif } from '../../services/api';
 
 interface GifViewerProps {
@@ -33,7 +33,7 @@ export const GifViewer: React.FC<GifViewerProps> = ({
 
   return (
     <div className="gif-viewer-container">
-      <div className="gif-header">
+      <div className="gif-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
         <h4>Environment Render Trajectory (render.gif)</h4>
         <button
           className="btn-outline-sm"
@@ -69,6 +69,26 @@ export const GifViewer: React.FC<GifViewerProps> = ({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Explanation & Legend for Raw MPE Render */}
+      <div className="gif-info-footer">
+        <div className="gif-legend-row">
+          <div className="legend-item">
+            <span className="legend-dot" style={{ background: '#8b8bd8', borderRadius: '50%', width: '12px', height: '12px' }} />
+            <span><strong>Purple Circles:</strong> Cooperative MARL Agents executing <code>actor.pt</code></span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot" style={{ background: '#333333', border: '1px solid #94a3b8', borderRadius: '50%', width: '8px', height: '8px' }} />
+            <span><strong>Black Dots:</strong> Target Landmarks to spread out &amp; cover</span>
+          </div>
+        </div>
+        <div className="gif-pipeline-note">
+          <Info size={14} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <span>
+            <strong>How this is generated:</strong> Clicking <strong>Render GIF</strong> runs <code>render_mpe.py</code>, stepping the saved checkpoint through the MPE physics engine for 25 timesteps to save raw RGB frames (<code>render.gif</code>) and export live coordinates (<code>trajectory.json</code>) for the interactive 2D Simulation tab.
+          </span>
+        </div>
       </div>
     </div>
   );

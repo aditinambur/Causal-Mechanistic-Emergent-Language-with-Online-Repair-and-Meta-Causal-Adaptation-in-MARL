@@ -1,4 +1,16 @@
-import { Run, RunConfig, RepairConfig, SystemInfo, MetricRow, CheckpointInfo } from '../types';
+import { 
+  Run, 
+  RunConfig, 
+  RepairConfig, 
+  SystemInfo, 
+  MetricRow, 
+  CheckpointInfo,
+  RepairVerdict,
+  BenchmarkConfig,
+  BenchmarkStatus,
+  BenchmarkSummary,
+  RunTrajectoryData
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -57,6 +69,12 @@ export async function fetchRunCheckpoints(runId: string): Promise<CheckpointInfo
   return data.checkpoints || [];
 }
 
+export async function fetchRunTrajectory(runId: string): Promise<RunTrajectoryData> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/trajectory`);
+  if (!res.ok) throw new Error('Failed to fetch trajectory');
+  return res.json();
+}
+
 export async function triggerRenderGif(runId: string): Promise<{ status: string; gif_path: string }> {
   const res = await fetch(`${API_BASE}/runs/${runId}/render`, { method: 'POST' });
   if (!res.ok) {
@@ -91,6 +109,50 @@ export async function fetchRepairLogs(runId: string, lines = 200): Promise<strin
   if (!res.ok) throw new Error('Failed to fetch repair logs');
   const data = await res.json();
   return data.logs || '';
+}
+
+export async function fetchRepairVerdict(runId: string): Promise<RepairVerdict> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/repair_verdict`);
+  if (!res.ok) throw new Error('Failed to fetch repair verdict');
+  return res.json();
+}
+
+export async function startBenchmark(config: BenchmarkConfig): Promise<{ status: string; pid: number }> {
+  const res = await fetch(`${API_BASE}/benchmark/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to start benchmark' }));
+    throw new Error(err.detail || 'Failed to start benchmark');
+  }
+  return res.json();
+}
+
+export async function fetchBenchmarkStatus(): Promise<BenchmarkStatus> {
+  const res = await fetch(`${API_BASE}/benchmark/status`);
+  if (!res.ok) throw new Error('Failed to fetch benchmark status');
+  return res.json();
+}
+
+export async function stopBenchmark(): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/benchmark/stop`, { method: 'POST' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to stop benchmark' }));
+    throw new Error(err.detail || 'Failed to stop benchmark');
+  }
+  return res.json();
+}
+
+export async function fetchBenchmarkSummary(): Promise<BenchmarkSummary> {
+  const res = await fetch(`${API_BASE}/benchmark/summary`);
+  if (!res.ok) throw new Error('Failed to fetch benchmark summary');
+  return res.json();
+}
+
+export function getBenchmarkPlotUrl(filename: string): string {
+  return `${API_BASE}/benchmark/plots/${filename}?t=${Date.now()}`;
 }
 
 export async function toggleArchiveRun(runId: string): Promise<{ archived: boolean }> {

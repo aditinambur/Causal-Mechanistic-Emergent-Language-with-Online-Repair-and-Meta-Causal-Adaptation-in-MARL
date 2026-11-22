@@ -4,10 +4,11 @@ import {
   PlaySquare, 
   Wrench, 
   Archive,
-  BarChart3
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'experiments' | 'detail' | 'repair' | 'archive';
+export type TabType = 'dashboard' | 'experiments' | 'detail' | 'repair' | 'benchmarks' | 'archive';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -24,7 +25,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'experiments' as TabType, label: 'Simulate & Train', icon: PlaySquare },
     { id: 'detail' as TabType, label: 'Run Details', icon: BarChart3, disabled: !selectedRunId },
-    { id: 'repair' as TabType, label: 'Causal Repair Studio', icon: Wrench, disabled: !selectedRunId },
+    { id: 'repair' as TabType, label: 'Causal Repair Studio', icon: Wrench, disabled: false },
+    { id: 'benchmarks' as TabType, label: 'Benchmark & Paper Suite', icon: Sparkles },
     { id: 'archive' as TabType, label: 'Archived Runs', icon: Archive },
   ];
 

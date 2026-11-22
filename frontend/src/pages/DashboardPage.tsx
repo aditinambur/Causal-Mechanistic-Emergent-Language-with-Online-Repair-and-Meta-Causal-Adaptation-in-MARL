@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Cpu, 
+  Zap, 
   Layers, 
   CheckCircle2, 
   Play, 
@@ -8,13 +8,14 @@ import {
 } from 'lucide-react';
 import { Run, SystemInfo } from '../types';
 import { MetricStatCard } from '../components/metrics/MetricStatCard';
-import { RunList } from '../components/experiments/RunList';
+import { ExperimentDropdown } from '../components/experiments/ExperimentDropdown';
 import { TrajectoryCanvas } from '../components/visualizer/TrajectoryCanvas';
 
 interface DashboardPageProps {
   runs: Run[];
   systemInfo: SystemInfo | null;
   selectedRunId: string | null;
+  onFocusRun?: (runId: string) => void;
   onSelectRun: (runId: string) => void;
   onInspectRepair: (runId: string) => void;
   onToggleArchive: (runId: string) => void;
@@ -26,6 +27,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   runs,
   systemInfo,
   selectedRunId,
+  onFocusRun,
   onSelectRun,
   onInspectRepair,
   onToggleArchive,
@@ -35,16 +37,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const activeRuns = runs.filter((r) => !r.archived);
   const completedRuns = activeRuns.filter((r) => r.status === 'completed');
   const repairedRuns = activeRuns.filter((r) => r.has_repair);
+  const selectedRun =
+    activeRuns.find((r) => r.run_id === selectedRunId) ||
+    activeRuns[0] ||
+    null;
+
+  const heroAgents = selectedRun?.config?.num_agents || 3;
+  const heroLandmarks = selectedRun?.config?.num_landmarks || 4;
 
   return (
     <div className="page-container">
       {/* Top Stat Cards */}
       <div className="stats-grid">
         <MetricStatCard
-          title="Hardware Accelerator"
-          value={systemInfo?.cuda_available ? systemInfo.device_name : 'CPU'}
-          subtext={systemInfo?.cuda_available ? 'CUDA 11.8 Accelerated' : 'Standard Host CPU'}
-          icon={Cpu}
+          title="LoRA Surgery Footprint"
+          value="1,293 Weights"
+          subtext="<1.5% System Params Tuned (Rank 4)"
+          icon={Zap}
           color="text-emerald"
         />
         <MetricStatCard
@@ -73,7 +82,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Trajectory Simulation & Quick Action Card */}
       <div className="dashboard-hero-section">
         <div className="hero-simulation-box">
-          <TrajectoryCanvas numAgents={3} numLandmarks={3} isPerturbed={false} />
+          <TrajectoryCanvas
+            numAgents={heroAgents}
+            numLandmarks={heroLandmarks}
+            isPerturbed={false}
+            runId={selectedRun?.run_id}
+          />
         </div>
 
         <div className="hero-action-box">
@@ -90,19 +104,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
       </div>
 
-      {/* Recent Experiments List */}
+      {/* Recent Experiments Dropdown */}
       <div className="section-container">
         <div className="section-header">
           <h3>Recent MARL Experiments</h3>
         </div>
-        <RunList
+        <ExperimentDropdown
           runs={runs}
-          selectedRunId={selectedRunId}
-          onSelectRun={onSelectRun}
+          selectedRunId={selectedRun?.run_id || selectedRunId}
+          onSelectRunId={(id) => (onFocusRun ? onFocusRun(id) : onSelectRun(id))}
+          onViewDetails={onSelectRun}
           onInspectRepair={onInspectRepair}
           onToggleArchive={onToggleArchive}
           onDeleteRun={onDeleteRun}
+          label="Choose Recent Experiment"
           showArchived={false}
+          showDetailsCard={true}
         />
       </div>
     </div>

@@ -19,6 +19,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ExperimentsPage } from './pages/ExperimentsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { CausalRepairPage } from './pages/CausalRepairPage';
+import { BenchmarkPage } from './pages/BenchmarkPage';
 import { RunList } from './components/experiments/RunList';
 
 export const App: React.FC = () => {
@@ -184,6 +185,7 @@ export const App: React.FC = () => {
               runs={runs}
               systemInfo={systemInfo}
               selectedRunId={selectedRunId}
+              onFocusRun={(id) => setSelectedRunId(id)}
               onSelectRun={(id) => {
                 setSelectedRunId(id);
                 setCurrentTab('detail');
@@ -202,6 +204,7 @@ export const App: React.FC = () => {
             <ExperimentsPage
               runs={runs}
               selectedRunId={selectedRunId}
+              onFocusRun={(id) => setSelectedRunId(id)}
               onLaunch={handleLaunchExperiment}
               isLaunching={isLaunching}
               isBusy={systemInfo?.status === 'busy'}
@@ -221,9 +224,11 @@ export const App: React.FC = () => {
           {currentTab === 'detail' && selectedRun && (
             <RunDetailPage
               run={selectedRun}
+              runs={runs}
               metrics={selectedRunMetrics}
               checkpoints={selectedRunCheckpoints}
               logs={selectedRunLogs}
+              onSelectRun={(id) => setSelectedRunId(id)}
               onBack={() => setCurrentTab('experiments')}
               onOpenRepair={(id) => {
                 setSelectedRunId(id);
@@ -235,13 +240,21 @@ export const App: React.FC = () => {
 
           {currentTab === 'repair' && (
             <CausalRepairPage
+              runs={runs}
               selectedRun={selectedRun}
+              onSelectRun={(id) => setSelectedRunId(id)}
               checkpoints={selectedRunCheckpoints}
               repairLogs={selectedRunRepairLogs}
               onStartRepair={handleStartRepair}
               isRepairing={isRepairing}
               onBack={() => setCurrentTab('detail')}
             />
+          )}
+
+          {currentTab === 'benchmarks' && (
+            <div className="page-container">
+              <BenchmarkPage />
+            </div>
           )}
 
           {currentTab === 'archive' && (

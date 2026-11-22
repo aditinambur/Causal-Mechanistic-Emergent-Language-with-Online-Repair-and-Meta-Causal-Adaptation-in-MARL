@@ -30,12 +30,13 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="header-right">
         {/* GPU Accelerator Status */}
-        <div className="gpu-status-pill">
-          <Cpu size={15} className={systemInfo?.cuda_available ? "text-emerald" : "text-gray"} />
+        <div className={`gpu-status-pill ${systemInfo?.cuda_available ? 'cuda-active' : 'cpu-active'}`}>
+          <span className={`status-dot ${systemInfo?.cuda_available ? 'emerald' : 'slate'}`} />
+          <Cpu size={14} className={systemInfo?.cuda_available ? "text-emerald" : "text-gray"} />
           <span className="gpu-name">
             {systemInfo?.cuda_available
-              ? `${systemInfo.device_name} (CUDA)`
-              : 'CPU Mode'}
+              ? `Using CUDA (${systemInfo.device_name})`
+              : 'Using CPU'}
           </span>
         </div>
 
