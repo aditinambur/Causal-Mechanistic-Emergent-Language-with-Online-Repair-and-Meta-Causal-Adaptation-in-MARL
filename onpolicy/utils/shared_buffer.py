@@ -323,9 +323,18 @@ class SharedReplayBuffer(object):
         # Previous-timestep centralized observations, used to recompute messages through
         # message_head during PPO updates so gradients flow into message_head's params.
         # prev_share_obs[t] = share_obs[t-1], with prev_share_obs[0] = zeros.
+        # When use_centralized_V is False (IPPO), self.share_obs has local obs_dim, so
+        # construct per-env concatenated observations from self.obs for sender message recomputation.
+        if self.share_obs.shape[-1] == num_agents * self.obs.shape[-1]:
+            prev_source = self.share_obs
+        else:
+            flat_obs = self.obs.reshape(
+                self.obs.shape[0], n_rollout_threads, 1, num_agents * self.obs.shape[-1]
+            )
+            prev_source = np.repeat(flat_obs, num_agents, axis=2)
         prev_share_obs = np.concatenate(
-            [np.zeros_like(self.share_obs[0:1]), self.share_obs[:-2]], axis=0
-        ).reshape(-1, *self.share_obs.shape[3:])
+            [np.zeros_like(prev_source[0:1]), prev_source[:-2]], axis=0
+        ).reshape(-1, *prev_source.shape[3:])
         advantages = advantages.reshape(-1, 1)
 
         for indices in sampler:

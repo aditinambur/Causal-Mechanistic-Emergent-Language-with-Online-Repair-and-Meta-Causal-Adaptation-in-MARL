@@ -267,7 +267,7 @@ class R_MAPPOPolicy:
         values, _ = self.critic(cent_obs, rnn_states_critic, masks, critic_messages)
         return values, action_log_probs, dist_entropy
 
-    def act(self, obs, rnn_states_actor, masks, available_actions=None, deterministic=False):
+    def act(self, obs, rnn_states_actor, masks, available_actions=None, deterministic=False, messages=None):
         """
         Compute actions using the given inputs.
         :param obs (np.ndarray): local agent inputs to the actor.
@@ -276,8 +276,11 @@ class R_MAPPOPolicy:
         :param available_actions: (np.ndarray) denotes which actions are available to agent
                                   (if None, all actions available)
         :param deterministic: (bool) whether the action should be mode of distribution or should be sampled.
+        :param messages: (np.ndarray / torch.Tensor) incoming messages from other agents.
         """
-        actor_out = self.actor(obs, rnn_states_actor, masks, available_actions, deterministic)
+        obs_batch_size = obs.shape[0] if hasattr(obs, "shape") else None
+        agent_messages = self._prepare_agent_messages(messages, obs_batch_size=obs_batch_size)
+        actor_out = self.actor(obs, rnn_states_actor, masks, available_actions, deterministic, agent_messages)
         if len(actor_out) == 4:
             actions, _, rnn_states_actor, messages = actor_out
             return actions, rnn_states_actor, messages

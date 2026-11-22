@@ -72,6 +72,7 @@ class RepairRunner(MPERunner):
 
     def __init__(self, config):
         super(RepairRunner, self).__init__(config)
+        self.last_param_counts = {}
         if getattr(self.all_args, 'lora_rank', 0) > 0:
             from onpolicy.algorithms.utils.lora import inject_lora_to_actor
             inject_lora_to_actor(
@@ -252,8 +253,19 @@ class RepairRunner(MPERunner):
             self.all_args.disable_messages = False
             self._set_repair_trainable(target)
             n_trainable = sum(p.numel() for p in self.trainer.policy.actor.parameters() if p.requires_grad)
+            n_lora_only = sum(
+                p.numel() for name, p in self.trainer.policy.actor.named_parameters()
+                if p.requires_grad and ("lora_A" in name or "lora_B" in name)
+            )
             attn = getattr(self.trainer.policy, "attention_weight", None)
             n_attn = attn.numel() if (attn is not None and attn.requires_grad) else 0
+            self.last_param_counts = {
+                "trainable_actor_params": int(n_trainable),
+                "trainable_lora_adapter_params": int(n_lora_only),
+                "trainable_comm_layer_params": int(n_trainable - n_lora_only),
+                "trainable_attn_params": int(n_attn),
+                "trainable_total_params": int(n_trainable + n_attn),
+            }
             print("  [REPAIR] target={}  trainable actor params={}  trainable attention params={}".format(
                 target, n_trainable, n_attn))
 
@@ -635,6 +647,8 @@ def _log_and_close(all_args, run_dir, baseline, degraded, detect_info, repaired,
         'controller': all_args.controller,
         'repair_target_arg': all_args.repair_target,
         'repair_iters': all_args.repair_iters,
+        'lora_rank': getattr(all_args, 'lora_rank', 0),
+        'lora_alpha': getattr(all_args, 'lora_alpha', 0.0),
         # Comparing recovery numbers across different thread counts is invalid -- see the
         # landmine in CODE_WALKTHROUGH.md -- so record both explicitly for later auditing.
         'n_rollout_threads': all_args.n_rollout_threads,
@@ -954,7 +968,16 @@ def main(args):
                 calc_landmarks = (obs_dim - 4 - 4 * (all_args.num_agents - 1)) // 2
                 if calc_landmarks > 0:
                     all_args.num_landmarks = calc_landmarks
-            print(f"[REPAIR] Auto-configured for checkpoint: num_agents={all_args.num_agents}, num_landmarks={all_args.num_landmarks}")
+                critic_path = os.path.join(os.path.dirname(actor_path), "critic.pt")
+                if os.path.exists(critic_path) and all_args.num_agents > 1:
+                    critic_sd = torch.load(critic_path, map_location="cpu")
+                    fc1_w = critic_sd.get("base.mlp.fc1.0.weight")
+                    if fc1_w is not None and fc1_w.shape[1] == obs_dim + all_args.hidden_size:
+                        all_args.use_centralized_V = False
+            print(
+                f"[REPAIR] Auto-configured for checkpoint: num_agents={all_args.num_agents}, "
+                f"num_landmarks={all_args.num_landmarks}, use_centralized_V={all_args.use_centralized_V}"
+            )
         except Exception as e:
             print(f"[REPAIR WARNING] Checkpoint shape inspection error: {e}")
 
@@ -1141,16 +1164,14 @@ def main(args):
             all_args.accept_reward_recovery, all_args.accept_comm_recovery)
         _print_acceptance(acc_info, accepted)
         saved_path = None
-        if not accepted:
-            print("  [ROLLBACK] restoring pre-repair parameters (manual mode: no escalation)")
-            runner._restore_repairable_state(snapshot)
-        else:
+        if accepted:
             saved_path = _save_accepted_repair(runner, run_dir, all_args.repair_target)
         print("\n[FINAL STATUS]")
-        print("  repair {}: {}".format("accepted" if accepted else "REJECTED (rolled back)",
+        print("  repair {}: {}".format("accepted" if accepted else "REJECTED (pending retention/held-out eval before rollback)",
                                         all_args.repair_target))
         final_status = {'mode': 'manual', 'target': all_args.repair_target,
-                        'accepted': accepted, 'saved_path': saved_path, **acc_info}
+                        'accepted': accepted, 'saved_path': saved_path,
+                        'param_counts': dict(runner.last_param_counts), **acc_info}
 
     elif all_args.controller == 'reward_only':
         # PRIORITY 7: fixed target, single attempt, no escalation -- isolates the TRIGGER
@@ -1176,7 +1197,8 @@ def main(args):
         print("\n[FINAL STATUS]")
         print("  repair {}: {}".format("accepted" if accepted else "REJECTED (rolled back)", target))
         final_status = {'mode': 'reward_only', 'target': target, 'accepted': accepted,
-                        'saved_path': saved_path, **acc_info}
+                        'saved_path': saved_path,
+                        'param_counts': dict(runner.last_param_counts), **acc_info}
 
     else:
         # PRIORITY 2/3/4/5: the causal adaptive controller -- auto-select, snapshot, repair,
@@ -1187,12 +1209,12 @@ def main(args):
         if final_status.get('accepted'):
             saved_path = _save_accepted_repair(runner, run_dir, final_status['accepted_target'])
         final_status['saved_path'] = saved_path
+        final_status['param_counts'] = dict(runner.last_param_counts)
 
-    # 5) Retention check: an accepted repair is re-measured on the ORIGINAL environment, so
-    # "repaired communication" can be told apart from "adapted to the mirror at the cost of the
-    # original task". Skipped when nothing was accepted -- a rejected attempt has already been
-    # rolled back, so the policy is bit-identical to the one that produced `baseline`.
-    if final_status.get('accepted'):
+    # 5) Retention check: an accepted repair (or forced --repair_target ablation) is re-measured
+    # on the ORIGINAL environment, so "repaired communication" can be told apart from "adapted
+    # to the mirror at the cost of the original task".
+    if final_status.get('accepted') or all_args.repair_target is not None:
         print("\n[5] Retention check on the ORIGINAL (unmirrored) environment:")
         final_status.update(
             _measure_normal_env_retention(runner, eval_envs, baseline, all_args, base_seed))
@@ -1200,10 +1222,14 @@ def main(args):
     # 6) Held-out re-check (TEAM_HANDOFF item 8): re-derive the recovery on a disjoint block of
     # layouts that had no part in the accept decision. `snapshot` holds the pre-repair weights,
     # needed because held-out baseline/degraded must be re-measured on the new layouts too.
-    if final_status.get('accepted') and all_args.holdout_episodes != 0:
+    if (final_status.get('accepted') or all_args.repair_target is not None) and all_args.holdout_episodes != 0:
         print("\n[6] Held-out re-check on episodes the decision never saw:")
         final_status.update(
             _holdout_validate_repair(runner, eval_envs, snapshot, all_args, base_seed))
+
+    if all_args.repair_target is not None and not final_status.get('accepted'):
+        print("  [ROLLBACK] restoring pre-repair parameters (manual mode: no escalation)")
+        runner._restore_repairable_state(snapshot)
 
     print("\n=== Summary ===")
     print("                  reward    comm_effect   value_sens      kl")

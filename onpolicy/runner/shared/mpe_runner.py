@@ -1,5 +1,6 @@
 import time
 import os
+import json
 import numpy as np
 import torch
 from onpolicy.runner.shared.base_runner import Runner
@@ -664,8 +665,48 @@ class MPERunner(Runner):
         
         all_frames = []
         reconstructed_frames = [[] for i in range(self.all_args.num_agents)]
+        traj_landmarks = []
+        traj_steps = []
+
+        def _extract_world_state(step_idx, step_messages=None):
+            try:
+                env0 = envs.envs[0]
+                world = getattr(env0, 'world', getattr(getattr(env0, 'env', None), 'world', None))
+                if world is None:
+                    return None, None
+                lms = [
+                    {"id": li, "x": round(float(lm.state.p_pos[0]), 4), "y": round(float(lm.state.p_pos[1]), 4)}
+                    for li, lm in enumerate(getattr(world, 'landmarks', []))
+                ]
+                ags = []
+                n_lms = max(len(lms), 1)
+                for ai, ag in enumerate(getattr(world, 'agents', [])):
+                    if step_messages is not None and ai < len(step_messages):
+                        tok = int(np.argmax(step_messages[ai])) % 5
+                    else:
+                        comm_vec = getattr(ag.state, 'c', None)
+                        tok = int(np.argmax(comm_vec)) % 5 if comm_vec is not None and len(comm_vec) > 0 else (ai % 5)
+                    ags.append({
+                        "id": ai,
+                        "x": round(float(ag.state.p_pos[0]), 4),
+                        "y": round(float(ag.state.p_pos[1]), 4),
+                        "vx": round(float(ag.state.p_vel[0]), 4),
+                        "vy": round(float(ag.state.p_vel[1]), 4),
+                        "emitted_token": tok,
+                        "target_lm": ai % n_lms,
+                    })
+                return lms, {"step": step_idx, "agents": ags}
+            except Exception:
+                return None, None
+
         for episode in range(self.all_args.render_episodes):
             obs = envs.reset()
+            if episode == 0:
+                lms, s0 = _extract_world_state(0)
+                if lms is not None and not traj_landmarks:
+                    traj_landmarks = lms
+                if s0 is not None:
+                    traj_steps.append(s0)
             if self.all_args.save_gifs:
                 imgs = envs.render('rgb_array')
                 image = imgs[0][0]
@@ -677,6 +718,10 @@ class MPERunner(Runner):
 
             rnn_states = np.zeros((self.n_rollout_threads, self.num_agents, self.recurrent_N, self.hidden_size), dtype=np.float32)
             masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
+            render_policy_messages = np.zeros(
+                (self.n_rollout_threads * self.num_agents, self.num_agents, self.all_args.hidden_size),
+                dtype=np.float32,
+            )
             
             episode_rewards = []
             
@@ -687,17 +732,19 @@ class MPERunner(Runner):
                 render_out = self.trainer.policy.act(np.concatenate(obs),
                                                      np.concatenate(rnn_states),
                                                      np.concatenate(masks),
-                                                     deterministic=True)
+                                                     deterministic=True,
+                                                     messages=render_policy_messages)
 
                 if len(render_out) == 3:
-                    action, rnn_states, reconstruction = render_out
-                    reconstructions = np.array(np.split(_t2n(reconstruction), self.n_rollout_threads))
+                    action, rnn_states, render_msg_out = render_out
+                    render_messages = _t2n(render_msg_out)
                 elif len(render_out) == 2:
                     action, rnn_states = render_out
-                    reconstructions = None
+                    render_messages = None
                 else:
                     raise ValueError("Unexpected act() output length: {}".format(len(render_out)))
 
+                reconstructions = None
                 actions = np.array(np.split(_t2n(action), self.n_rollout_threads))
                 rnn_states = np.array(np.split(_t2n(rnn_states), self.n_rollout_threads))
 
@@ -716,10 +763,24 @@ class MPERunner(Runner):
                 # Obser reward and next obs
                 obs, rewards, dones, infos = envs.step(actions_env, reconstructions)
                 episode_rewards.append(rewards)
+                if episode == 0:
+                    _, st_rec = _extract_world_state(step + 1, render_messages)
+                    if st_rec is not None:
+                        traj_steps.append(st_rec)
 
                 rnn_states[dones == True] = np.zeros(((dones == True).sum(), self.recurrent_N, self.hidden_size), dtype=np.float32)
                 masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
                 masks[dones == True] = np.zeros(((dones == True).sum(), 1), dtype=np.float32)
+
+                if render_messages is not None:
+                    msg_dim = render_messages.shape[-1]
+                    messages_reshaped = render_messages.reshape(self.n_rollout_threads, self.num_agents, msg_dim)
+                    render_policy_messages = self._build_receiver_message_tensor(messages_reshaped)
+                else:
+                    render_policy_messages = np.zeros(
+                        (self.n_rollout_threads * self.num_agents, self.num_agents, self.all_args.hidden_size),
+                        dtype=np.float32,
+                    )
 
                 if self.all_args.save_gifs:
                     imgs = envs.render('rgb_array')
@@ -740,4 +801,17 @@ class MPERunner(Runner):
             imageio.mimsave(str(self.gif_dir) + '/render.gif', all_frames, duration=self.all_args.ifi)
             for i in range(self.all_args.num_agents):
                 imageio.mimsave(str(self.gif_dir) + '/render_reconstruction_agent' + str(i) + '.gif', reconstructed_frames[i], duration=self.all_args.ifi)
+            if traj_steps:
+                try:
+                    traj_path = os.path.join(str(self.gif_dir), 'trajectory.json')
+                    with open(traj_path, 'w', encoding='utf-8') as tf:
+                        json.dump({
+                            "num_agents": int(self.num_agents),
+                            "num_landmarks": int(len(traj_landmarks) or self.all_args.num_landmarks),
+                            "seed": int(self.all_args.seed),
+                            "landmarks": traj_landmarks,
+                            "steps": traj_steps,
+                        }, tf, indent=2)
+                except Exception as e:
+                    print(f"[RENDER WARNING] Failed to write trajectory.json: {e}")
 
