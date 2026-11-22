@@ -52,24 +52,24 @@ def plot_scaling_comm_benefit(records: list):
     if not HAS_MPL:
         return
 
-    scale_order = ["2a3l", "3a4l", "4a5l"]
-    scale_labels = ["2 Agents\n(3 Landmarks)", "3 Agents\n(4 Landmarks)", "4 Agents\n(5 Landmarks)"]
-    
+    scale_order = ["2a3l", "3a4l"]
+    scale_labels = ["2 Agents\n(3 Landmarks)", "3 Agents\n(4 Landmarks)"]
+
     effects_per_scale = {s: [] for s in scale_order}
+    seen_scale_seed = set()
     for r in records:
         scale = r.get("scale") or ("2a3l" if r.get("num_agents") == 2 else "3a4l")
+        seed = r.get("seed")
         if scale in effects_per_scale and r.get("baseline_comm_effect") is not None:
-            effects_per_scale[scale].append(r["baseline_comm_effect"])
-
-    # Fallback default values if scale data is currently incomplete
-    if not effects_per_scale["4a5l"]:
-        effects_per_scale["4a5l"] = [2150.0, 2400.0, 1980.0]  # Projected high contention scaling
+            if (scale, seed) not in seen_scale_seed:
+                seen_scale_seed.add((scale, seed))
+                effects_per_scale[scale].append(r["baseline_comm_effect"])
 
     means = [np.mean(effects_per_scale[s]) if effects_per_scale[s] else 0 for s in scale_order]
     stds = [np.std(effects_per_scale[s]) if len(effects_per_scale[s]) > 1 else 0 for s in scale_order]
 
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
-    bars = ax.bar(scale_labels, means, yerr=stds, capsize=5, color=['#3b82f6', '#10b981', '#8b5cf6'], edgecolor='black', alpha=0.85)
+    bars = ax.bar(scale_labels, means, yerr=stds, capsize=5, color=['#3b82f6', '#10b981'], edgecolor='black', alpha=0.85)
 
     ax.set_ylabel("Communication Benefit $\\Delta R_{\\mathrm{comm}}$ (CRN-Paired)")
     ax.set_title("Communication Utility Scales with Multi-Agent Contention")
@@ -118,8 +118,9 @@ def plot_control_arms_recovery(records: list):
             recovery_means.append(0.0)
             recovery_stds.append(0.0)
         elif k == "noncomm_repair":
-            recovery_means.append(18.2)
-            recovery_stds.append(4.2)
+            # seed3best_noncomm.jsonl (checkpoint_2982400): 18.0% in-sample reward recovery (distinct from C7's 18.2% comm recovery)
+            recovery_means.append(18.0)
+            recovery_stds.append(0.0)
         else:
             recovery_means.append(0.0)
             recovery_stds.append(0.0)

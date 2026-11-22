@@ -16,6 +16,7 @@ import time
 import json
 import csv
 import glob
+import hashlib
 import re
 import argparse
 import subprocess
@@ -261,7 +262,77 @@ def execute_subcommand(cmd: List[str], desc: str) -> str:
     return "".join(collected_output)
 
 
-def discover_best_checkpoint(scenario_key: str, seed: int) -> Optional[Path]:
+def _checkpoint_matches_scale(ckpt_dir: Path, num_agents: int, num_landmarks: int) -> bool:
+    """Verify checkpoint folder contains actor.pt and matches expected observation dimensionality."""
+    if ckpt_dir.name.endswith("_repair_runs"):
+        return False
+    actor_path = ckpt_dir / "actor.pt"
+    if not actor_path.is_file():
+        return False
+    expected_obs_dim = 4 + 2 * num_landmarks + 4 * (num_agents - 1)
+    try:
+        import torch
+        sd = torch.load(actor_path, map_location="cpu", weights_only=False)
+        if "message_head.weight" in sd:
+            obs_dim = int(sd["message_head.weight"].shape[1])
+            if obs_dim != expected_obs_dim:
+                return False
+    except Exception:
+        pass
+    return True
+
+
+def _resolve_checkpoint_provenance(ckpt_dir: Path) -> Dict[str, Any]:
+    """Return workspace-relative path, resolved training step, and run max step for a checkpoint."""
+    try:
+        rel_path = ckpt_dir.resolve().relative_to(WORKSPACE_ROOT.resolve()).as_posix()
+    except ValueError:
+        rel_path = ckpt_dir.as_posix()
+
+    models_dir = ckpt_dir.parent
+    step_ckpts: Dict[int, Path] = {}
+    for p in models_dir.glob("checkpoint_*"):
+        if not p.is_dir() or p.name == "checkpoint_best" or p.name.endswith("_repair_runs"):
+            continue
+        suffix = p.name.split("_", 1)[1]
+        if suffix.isdigit():
+            step_ckpts[int(suffix)] = p
+
+    total_train_steps = max(step_ckpts.keys()) if step_ckpts else None
+    if total_train_steps is None:
+        csv_path = models_dir.parent / "causal_influence.csv"
+        if csv_path.is_file():
+            try:
+                with csv_path.open("r", newline="", encoding="utf-8") as f:
+                    rows = list(csv.DictReader(f))
+                if rows and rows[-1].get("total_num_steps"):
+                    total_train_steps = int(float(rows[-1]["total_num_steps"]))
+            except Exception:
+                pass
+
+    checkpoint_step = None
+    if ckpt_dir.name != "checkpoint_best" and ckpt_dir.name.startswith("checkpoint_"):
+        suffix = ckpt_dir.name.split("_", 1)[1]
+        if suffix.isdigit():
+            checkpoint_step = int(suffix)
+    elif ckpt_dir.name == "checkpoint_best":
+        best_actor = ckpt_dir / "actor.pt"
+        if best_actor.is_file():
+            best_sha = hashlib.sha256(best_actor.read_bytes()).hexdigest()
+            for step_int, p in sorted(step_ckpts.items()):
+                cand_actor = p / "actor.pt"
+                if cand_actor.is_file() and hashlib.sha256(cand_actor.read_bytes()).hexdigest() == best_sha:
+                    checkpoint_step = step_int
+                    break
+
+    return {
+        "checkpoint_path": rel_path,
+        "checkpoint_step": checkpoint_step,
+        "total_train_steps": total_train_steps,
+    }
+
+
+def discover_best_checkpoint(scenario_key: str, seed: int, use_select_best: bool = False) -> Optional[Path]:
     """Find the best or final checkpoint for a given scale and seed."""
     cfg = SCENARIO_SCALES[scenario_key]
     num_a = cfg["num_agents"]
@@ -272,8 +343,6 @@ def discover_best_checkpoint(scenario_key: str, seed: int) -> Optional[Path]:
         base_results / f"benchmark_{num_a}a{num_l}l_seed{seed}",
         base_results / f"benchmark_{num_a}a{num_l}_seed{seed}",
     ]
-    if num_a == 2 and num_l == 3:
-        possible_dirs.append(base_results / f"phase2_3_seed{seed}")
 
     # Also search by glob if not exact match
     if base_results.exists():
@@ -291,10 +360,30 @@ def discover_best_checkpoint(scenario_key: str, seed: int) -> Optional[Path]:
 
         for models_dir in candidate_model_dirs:
             if models_dir.exists():
+                if use_select_best:
+                    csv_path = models_dir.parent / "causal_influence.csv"
+                    if csv_path.is_file():
+                        try:
+                            from onpolicy.scripts.select_best_checkpoint import _load_rows, score_checkpoints
+                            rows = _load_rows(str(csv_path))
+                            ranked, _ = score_checkpoints(rows)
+                            for r in ranked:
+                                cand = models_dir / f"checkpoint_{int(r['total_num_steps'])}"
+                                if cand.exists() and _checkpoint_matches_scale(cand, num_a, num_l):
+                                    return cand
+                        except Exception:
+                            pass
                 ckpt_best = models_dir / "checkpoint_best"
-                if ckpt_best.exists():
+                if ckpt_best.exists() and _checkpoint_matches_scale(ckpt_best, num_a, num_l):
                     return ckpt_best
-                ckpts = sorted(models_dir.glob("checkpoint_*"), key=lambda p: p.stat().st_mtime, reverse=True)
+                ckpts = sorted(
+                    (
+                        p for p in models_dir.glob("checkpoint_*")
+                        if p.is_dir() and not p.name.endswith("_repair_runs") and _checkpoint_matches_scale(p, num_a, num_l)
+                    ),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
                 if ckpts:
                     return ckpts[0]
 
@@ -308,7 +397,8 @@ def run_benchmarks(
     repair_iters: int = 15,
     measure_episodes: int = 6,
     holdout_episodes: int = 6,
-    output_prefix: str = "benchmark_master"
+    output_prefix: str = "benchmark_master",
+    use_select_best: bool = False
 ):
     """Run full benchmarking matrix across scales, arms, and seeds."""
     csv_file = DATA_RESULTS_DIR / f"{output_prefix}.csv"
@@ -329,10 +419,11 @@ def run_benchmarks(
         scale_cfg = SCENARIO_SCALES[scale_key]
 
         for seed in seeds:
-            ckpt = discover_best_checkpoint(scale_key, seed)
+            ckpt = discover_best_checkpoint(scale_key, seed, use_select_best=use_select_best)
             if ckpt is None:
                 print(f"[WARNING] No trained checkpoint found for {scale_key} Seed {seed}. Skipping. (Train it first with --train_scale {scale_key})")
                 continue
+            provenance = _resolve_checkpoint_provenance(ckpt)
 
             for arm_key in selected_arms:
                 arm_cfg = CONTROL_ARMS[arm_key]
@@ -380,6 +471,7 @@ def run_benchmarks(
                     "arm": arm_key,
                     "arm_name": arm_cfg["name"],
                     "checkpoint": ckpt.name,
+                    **provenance,
                     **parsed
                 }
 
@@ -419,6 +511,7 @@ def main():
     parser.add_argument("--measure_episodes", type=int, default=6, help="Number of CRN-paired episodes")
     parser.add_argument("--holdout_episodes", type=int, default=6, help="Number of fresh held-out episodes")
     parser.add_argument("--output_prefix", type=str, default="benchmark_master", help="Output file prefix")
+    parser.add_argument("--use_select_best", action="store_true", help="Select checkpoint via select_best_checkpoint.py instead of checkpoint_best")
     args = parser.parse_args()
 
     run_benchmarks(
@@ -428,7 +521,8 @@ def main():
         repair_iters=args.repair_iters,
         measure_episodes=args.measure_episodes,
         holdout_episodes=args.holdout_episodes,
-        output_prefix=args.output_prefix
+        output_prefix=args.output_prefix,
+        use_select_best=args.use_select_best
     )
 
 

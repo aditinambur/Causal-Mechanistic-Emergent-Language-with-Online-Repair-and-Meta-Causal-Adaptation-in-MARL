@@ -1,0 +1,24 @@
+{
+  "6": [
+    {
+      "rank": 1,
+      "step": 102400,
+      "score": 2076.12,
+      "score_source": "comm_effect",
+      "checkpoint_path": "onpolicy/scripts/results/MPE/simple_spread/mappo/benchmark_3a4l_seed6/run1/models/checkpoint_102400",
+      "baseline_reward": -7914.9,
+      "baseline_comm_effect": -1803.5,
+      "reward_drop_ratio": 0.34
+    },
+    {
+      "rank": 2,
+      "step": 326400,
+      "score": 1040.66,
+      "score_source": "comm_effect",
+      "checkpoint_path": "onpolicy/scripts/results/MPE/simple_spread/mappo/benchmark_3a4l_seed6/run1/models/checkpoint_326400",
+      "baseline_reward": -8490.1,
+      "baseline_comm_effect": 7762.8,
+      "reward_drop_ratio": -0.22
+    }
+  ]
+}
