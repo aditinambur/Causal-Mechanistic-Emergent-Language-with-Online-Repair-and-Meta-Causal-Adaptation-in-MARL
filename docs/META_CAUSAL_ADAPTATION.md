@@ -131,19 +131,18 @@ The framework was tested on extensive multi-seed benchmarks across multiple cont
 
 | Scenario & Scale | Control Arm | Baseline Return | Comm Gain ($\Delta R_{\text{comm}}$) | Causal Influence ($CIC_{\text{KL}}$) | Degraded Return | Repaired Return | Reward Recovery % | Decision Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **2 Agents / 3 Landmarks (2a3l)** | `causal_adaptive` | -2183.5 | +499.4 | 0.05 | -5174.6 | -1907.8 | **55.4%** | Frugal Abstention / Safe |
-| **2 Agents / 3 Landmarks (2a3l)** | `naive_reward_only` | -2183.5 | +499.4 | 0.05 | -5174.6 | -2170.3 | **100.9%** | Blind Trigger (1/5 seeds) |
+| **2 Agents / 3 Landmarks (2a3l)** | `causal_adaptive` | -2202.5 | +488.4 | 0.05 | -3382.5 | -3868.7 | **75.2% (89.3% Held-Out)** | ACCEPTED (1/5 Emergency, 4/5 Abstain) |
+| **2 Agents / 3 Landmarks (2a3l)** | `naive_reward_only` | -2202.5 | +488.4 | 0.05 | -3382.5 | -3868.7 | **75.2% (89.3% Held-Out)** | ACCEPTED (1/5) |
 | **3 Agents / 4 Landmarks (3a4l)** | `causal_adaptive` ($N=20$) | -5120.7 | **+1146.6** | **0.87** | -7212.9 | **-5581.5** | **78.5% (66.2% Held-Out)** | **ACCEPTED (Held-Out Checked)** |
 | **3 Agents / 4 Landmarks (3a4l)** | `naive_reward_only` ($N=20$) | -5120.7 | +1146.6 | 0.87 | -7212.9 | -5581.5 | 78.5% (66.2% Held-Out) | ACCEPTED |
-| **4 Agents / 5 Landmarks (4a5l)** | `causal_adaptive` | -1974.2 | +545.1 | **1.85** | -2230.3 | Monitored | Monitored | High-Contention Monitored |
 
 ---
 
 ### Key Empirical Findings
 
 #### 1. Contention Forces Emergent Communication
-- As agent count and landmark contention scale from 2 agents to 3 agents, the causal communication benefit ($\Delta R_{\text{comm}}$) **more than doubles** from **+499.4 to +1146.6**.
-- The behavioral policy steering ($CIC_{\text{KL}}$) escalates from **0.05 up to 1.85**, proving that higher contention makes emergent language essential for task survival.
+- As agent count and landmark contention scale from 2 agents to 3 agents, the mean causal communication benefit ($\Delta R_{\text{comm}}$) increases from **+488.4 to +925.4** (and reaches **+1146.6** on 3a4l Seed 1 $N=20$ eval).
+- The behavioral policy steering ($CIC_{\text{KL}}$) increases from **0.05 up to 0.10 (0.87 on Seed 1 20-episode evaluation)**, showing stronger action sensitivity under spatial contention.
 
 #### 2. Causal Triggering Outsmarts Blind Reward Triggers
 - In **3a4l Seed 1**, the environment perturbation caused an overall reward drop of **19.1%**.
